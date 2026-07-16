@@ -1,0 +1,25 @@
+{
+  "name": "polygen-tracker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "yarn dev",
+    "dev": "vite --config ./config/vite.config.dev.ts --host --mode development",
+    "build": "vue-tsc -b && yarn build:prod",
+    "build:dev": "vite build --config ./config/vite.config.dev.ts --mode development",
+    "build:prod": "vite build --config ./config/vite.config.prod.ts --mode production",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.39"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/tsconfig": "^0.9.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vue-tsc": "^3.3.5"
+  }
+}
