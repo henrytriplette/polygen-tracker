@@ -46,6 +46,66 @@ const PROGRESSIONS: Record<VibeName, Progression[]> = {
     { degrees: [0, 4, 3, 6], weight: 2 },  // i-v-iv-VII
     { degrees: [0, 3, 6, 4], weight: 1 },  // i-iv-VII-v
   ],
+  synthwave: [
+    { degrees: [0, 5, 2, 6], weight: 3 },  // i-VI-III-VII (the retrowave loop)
+    { degrees: [0, 5, 3, 6], weight: 2 },  // i-VI-iv-VII
+    { degrees: [0, 3, 5, 6], weight: 2 },  // i-iv-VI-VII (rising night drive)
+    { degrees: [0, 6, 5, 2], weight: 1 },  // i-VII-VI-III
+  ],
+  house: [
+    { degrees: [0, 5, 0, 6], weight: 3 },  // i-VI-i-VII (two-chord pump)
+    { degrees: [0, 3, 0, 5], weight: 2 },  // i-iv-i-VI (deep house sway)
+    { degrees: [0, 5, 2, 6], weight: 2 },  // i-VI-III-VII
+    { degrees: [0, 6, 0, 6], weight: 1 },  // i-VII loop (hypnotic)
+  ],
+  lofi: [
+    { degrees: [1, 4, 0, 0], weight: 3 },  // ii-V-I-I (the jazz cadence)
+    { degrees: [1, 4, 0, 5], weight: 2 },  // ii-V-I-vi (turnaround)
+    { degrees: [0, 3, 1, 4], weight: 2 },  // I-IV-ii-V (gentle cycle)
+    { degrees: [0, 5, 3, 4], weight: 1 },  // I-vi-IV-V (nostalgic)
+  ],
+  funk: [
+    { degrees: [0, 0, 3, 0], weight: 3 },  // one-chord vamp with iv color
+    { degrees: [0, 3, 0, 4], weight: 2 },  // i-IV-i-v (dorian vamp)
+    { degrees: [0, 0, 5, 6], weight: 2 },  // vamp with VI-VII horn hits
+    { degrees: [0, 6, 3, 0], weight: 1 },  // i-VII-iv-i
+  ],
+  punk: [
+    { degrees: [0, 3, 4, 4], weight: 3 },  // I-IV-V-V (three chords, the truth)
+    { degrees: [0, 4, 5, 3], weight: 3 },  // I-V-vi-IV (pop-punk anthem)
+    { degrees: [0, 3, 0, 4], weight: 2 },  // I-IV-I-V (ramones-core)
+    { degrees: [0, 5, 3, 4], weight: 1 },  // I-vi-IV-V
+  ],
+  techno: [
+    { degrees: [0, 0, 0, 5], weight: 3 },  // near-static drone, late shift
+    { degrees: [0, 0, 3, 0], weight: 2 },  // hypnotic i with iv color
+    { degrees: [0, 5, 0, 6], weight: 2 },  // minimal two-chord swing
+    { degrees: [0, 0, 0, 0], weight: 1 },  // pure drone
+  ],
+  dub: [
+    { degrees: [0, 3, 0, 3], weight: 3 },  // i-iv riddim rock
+    { degrees: [0, 0, 3, 3], weight: 2 },  // two bars each, heavy sway
+    { degrees: [0, 5, 0, 3], weight: 2 },  // i-VI-i-iv roots motion
+    { degrees: [0, 3, 4, 0], weight: 1 },  // i-iv-v-i turnaround
+  ],
+  idm: [
+    { degrees: [0, 1, 5, 4], weight: 2 },  // stepwise oddness
+    { degrees: [0, 2, 6, 1], weight: 2 },  // unresolved wandering
+    { degrees: [0, 5, 1, 6], weight: 2 },  // sidesteps
+    { degrees: [0, 4, 2, 5], weight: 2 },  // no home base
+  ],
+  hardcore: [
+    { degrees: [0, 0, 6, 6], weight: 3 },  // two-riff hammer
+    { degrees: [0, 6, 0, 6], weight: 2 },  // i-VII seesaw
+    { degrees: [0, 5, 6, 0], weight: 2 },  // rave riff cycle
+    { degrees: [0, 0, 0, 6], weight: 1 },  // one riff, late flip
+  ],
+  dnb: [
+    { degrees: [0, 5, 3, 6], weight: 3 },  // moody rolling minor
+    { degrees: [0, 3, 0, 5], weight: 2 },  // deep two-chord roll
+    { degrees: [0, 5, 2, 6], weight: 2 },  // liquid motion
+    { degrees: [0, 6, 3, 5], weight: 1 },  // darker turn
+  ],
 };
 
 export interface ChordInfo {

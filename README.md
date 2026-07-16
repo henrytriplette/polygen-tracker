@@ -7,9 +7,10 @@ Click GENERATE and get a complete 4-channel retro song — lead, harmony, bass, 
 ## Features
 
 - **Instant song generation** — drums (kick templates + probability), bass (Euclidean rhythms), melody (constrained random walk with motifs), harmony (arpeggiated chord tones), all locked to the chosen key/scale
-- **5 vibe templates** with song structures (verse/contrast/bridge/breakdown/climax) in short/long/epic lengths
+- **15 vibe templates** in short/long/epic lengths, picked from a grouped dropdown — GAME (Adventure, Battle, Dungeon, Title Screen, Boss), ELECTRONIC (Synthwave, House, Techno, Dub, IDM, Hardcore, DnB), and CLASSICS (Lo-Fi hip-hop, Funk, Punk). Each has genre-authentic structure (verse–chorus, build–drop, hypnotic loops, dub versions with dropouts, vamps), chord progressions (retrowave i-VI-III-VII, jazzy ii-V-I, techno drones, hoover riffs…), drum templates (four-on-the-floor, one-drop, two-step breaks, euclidean IDM scatters, gabber kick walls), bass style, instrument palette, effects, and song-name generator.
 - **Live playback** — WebAudio rendering via ZzFX/ZzFXM (~1KB synth), per-channel mute/solo, playhead in the grid
 - **Per-pattern and per-channel regeneration** — keep what you like, reroll the rest
+- **Per-channel vibe overrides** — give each instrument its own genre (e.g. house drums under a dungeon lead, funk bass, lo-fi chords). The channel takes its pattern style, density, instrument sound, and effects from its own vibe; chord-progression flavor follows the harmony channel; key/scale/BPM stay global so everything remains locked together
 - **Polyend Tracker export** — a zip containing `project.mt`, `patterns/*.mtp` + `patternsMetadata`, and `instruments/*.pti` with the ZzFX instruments rendered to samples (lead/harmony/bass at C4, drums split into kick/snare/hat). Unzip into `/Projects` on the SD card.
 - **WAV export** of the full mix
 - **PWA** — installable, works offline

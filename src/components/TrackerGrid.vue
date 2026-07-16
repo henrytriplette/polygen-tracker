@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { store, CHANNEL_LABELS } from '../store';
+import { store, CHANNEL_LABELS, VIBE_GROUPS } from '../store';
 import { drumNoteToName, effectToDisplayString, zzfxmToNoteName } from '../engine';
+import type { VibeName } from '../engine';
 
 const state = store.state;
+
+function onChannelVibe(ch: number, e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  store.setChannelVibe(ch, value === '' ? null : (value as VibeName));
+}
 
 const pattern = computed(() => state.song.patterns[state.selectedPattern]);
 const effects = computed(() => state.song.patternEffects?.[state.selectedPattern]);
@@ -59,6 +65,18 @@ function hasNote(ch: number, row: number): boolean {
               >S</button>
               <button class="mini" title="Regenerate channel" @click="store.regenChannel(ch)">↻</button>
             </span>
+            <select
+              class="ch-vibe"
+              :class="{ overridden: !!state.song.channelVibes?.[ch] }"
+              :value="state.song.channelVibes?.[ch] ?? ''"
+              title="Vibe for this channel (SONG = follow the song vibe)"
+              @change="onChannelVibe(ch, $event)"
+            >
+              <option value="">SONG</option>
+              <optgroup v-for="g in VIBE_GROUPS" :key="g.label" :label="g.label">
+                <option v-for="v in g.vibes" :key="v.value" :value="v.value">{{ v.label }}</option>
+              </optgroup>
+            </select>
           </th>
         </tr>
       </thead>
@@ -132,6 +150,23 @@ th {
 .mini.active {
   background: var(--accent);
   color: #000;
+  border-color: var(--accent);
+}
+
+.ch-vibe {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 3px;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  max-width: 110px;
+}
+
+.ch-vibe.overridden {
+  color: var(--accent);
   border-color: var(--accent);
 }
 

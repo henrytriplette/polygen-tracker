@@ -50,6 +50,16 @@ const VIBE_BASS: Record<string, BassConfig> = {
   dungeon:   { styles: ['sparse'], voicing: 'root' },
   titleScreen: { styles: ['steady', 'sparse'], voicing: 'root-fifth' },
   boss:      { styles: ['driving'], voicing: 'root-walk' },
+  synthwave: { styles: ['driving', 'steady'], voicing: 'root' },       // pulsing eighth-note synth bass
+  house:     { styles: ['steady', 'driving'], voicing: 'root' },       // pumping root ostinato
+  lofi:      { styles: ['sparse', 'walking'], voicing: 'root-walk' },  // lazy jazz walk
+  funk:      { styles: ['walking', 'driving'], voicing: 'root-walk' }, // syncopated pocket lines
+  punk:      { styles: ['driving'], voicing: 'root' },                 // downpicked eighths, root only
+  techno:    { styles: ['driving', 'steady'], voicing: 'root' },       // machine pulse under the kick
+  dub:       { styles: ['sparse', 'walking'], voicing: 'root-walk' },  // melodic heavyweight lines, lots of space
+  idm:       { styles: ['walking', 'sparse'], voicing: 'root-walk' },  // wandering, asymmetric
+  hardcore:  { styles: ['driving'], voicing: 'root' },                 // hammering distorted root
+  dnb:       { styles: ['steady', 'sparse'], voicing: 'root' },        // long reese notes under the break
 };
 
 function generateBassSegment(

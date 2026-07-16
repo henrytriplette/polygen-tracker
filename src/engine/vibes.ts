@@ -274,6 +274,134 @@ export const VIBE_CONFIG: Record<VibeName, VibeConfig> = {
     fxChance: 0.35,
   },
 
+  techno: {
+    bpmRange: [125, 140],
+    preferredScales: ['minor', 'dorian'],
+    melodyDensity: 0.25,
+    bassDensity: [6, 9],
+    drumIntensity: 'intense',
+    structures: {
+      short: [
+        // hypnotic loop straight into peak
+        { roles: ['verse', 'climax'], sequence: [0, 0, 1, 1] },
+        { roles: ['verse', 'breakdown'], sequence: [0, 0, 1, 0] },
+      ],
+      long: [
+        // linear build: loop, percussion shift, peak, strip back, peak
+        { roles: ['verse', 'bridge', 'climax', 'breakdown'], sequence: [0, 0, 1, 2, 2, 3, 2, 2] },
+        { roles: ['verse', 'contrast', 'breakdown'], sequence: [0, 0, 0, 1, 2, 1, 1, 0] },
+      ],
+      epic: [
+        // warehouse marathon: two peaks, one long strip-down between
+        { roles: ['verse', 'bridge', 'climax', 'breakdown'], sequence: [0, 0, 1, 2, 2, 2, 3, 1, 2, 2, 0] },
+        { roles: ['verse', 'contrast', 'climax', 'breakdown'], sequence: [0, 0, 1, 0, 2, 2, 3, 1, 2, 2] },
+      ],
+    },
+    fxChance: 0.3,
+  },
+
+  dub: {
+    bpmRange: [70, 90],
+    preferredScales: ['minor', 'dorian'],
+    melodyDensity: 0.2,
+    bassDensity: [4, 6],
+    drumIntensity: 'light',
+    structures: {
+      short: [
+        // riddim with a version (dropout) pass
+        { roles: ['verse', 'breakdown'], sequence: [0, 1, 0, 1] },
+        { roles: ['verse', 'contrast'], sequence: [0, 0, 1, 0] },
+      ],
+      long: [
+        // groove, dub it out (drums+bass), bring it back — the version workflow
+        { roles: ['verse', 'contrast', 'breakdown'], sequence: [0, 0, 2, 0, 1, 2, 0, 0] },
+        { roles: ['verse', 'breakdown', 'bridge'], sequence: [0, 1, 0, 2, 0, 1, 0] },
+      ],
+      epic: [
+        // extended session: multiple dropouts, always back to the riddim
+        { roles: ['verse', 'contrast', 'breakdown', 'bridge'], sequence: [0, 0, 2, 0, 1, 3, 2, 0, 1, 0] },
+        { roles: ['verse', 'contrast', 'breakdown'], sequence: [0, 0, 1, 2, 0, 0, 2, 1, 0, 0] },
+      ],
+    },
+    fxChance: 0.45,
+  },
+
+  idm: {
+    bpmRange: [95, 130],
+    preferredScales: ['dorian', 'harmonicMinor', 'minor'],
+    melodyDensity: 0.45,
+    bassDensity: [5, 8],
+    drumIntensity: 'medium',
+    structures: {
+      short: [
+        // asymmetric on purpose
+        { roles: ['verse', 'contrast'], sequence: [0, 1, 1, 0] },
+        { roles: ['verse', 'climax'], sequence: [0, 0, 1, 0, 1] },
+      ],
+      long: [
+        // form as a puzzle: sections recombine rather than repeat
+        { roles: ['verse', 'contrast', 'bridge'], sequence: [0, 1, 0, 2, 1, 1, 0] },
+        { roles: ['verse', 'contrast', 'breakdown', 'climax'], sequence: [0, 1, 2, 0, 3, 1] },
+      ],
+      epic: [
+        { roles: ['verse', 'contrast', 'bridge', 'climax'], sequence: [0, 1, 2, 0, 1, 3, 2, 1, 0, 3] },
+        { roles: ['verse', 'contrast', 'breakdown', 'climax'], sequence: [0, 1, 0, 2, 1, 3, 0, 2, 3, 1, 0] },
+      ],
+    },
+    fxChance: 0.6,
+  },
+
+  hardcore: {
+    bpmRange: [160, 190],
+    preferredScales: ['minor', 'harmonicMinor'],
+    melodyDensity: 0.5,
+    bassDensity: [8, 12],
+    drumIntensity: 'intense',
+    structures: {
+      short: [
+        // no warm-up
+        { roles: ['verse', 'climax'], sequence: [0, 1, 0, 1] },
+        { roles: ['verse', 'climax'], sequence: [0, 1, 1, 1] },
+      ],
+      long: [
+        // rave arc: riff, build, DROP DROP, again
+        { roles: ['verse', 'bridge', 'climax'], sequence: [0, 1, 2, 2, 0, 1, 2, 2] },
+        { roles: ['verse', 'climax', 'breakdown'], sequence: [0, 1, 1, 2, 0, 1, 1] },
+      ],
+      epic: [
+        { roles: ['verse', 'bridge', 'climax', 'breakdown'], sequence: [0, 1, 2, 2, 3, 1, 2, 2, 2] },
+        { roles: ['verse', 'contrast', 'climax', 'breakdown'], sequence: [0, 1, 2, 2, 0, 3, 1, 2, 2, 2] },
+      ],
+    },
+    fxChance: 0.55,
+  },
+
+  dnb: {
+    bpmRange: [165, 180],
+    preferredScales: ['minor', 'dorian'],
+    melodyDensity: 0.35,
+    bassDensity: [5, 8],
+    drumIntensity: 'high',
+    structures: {
+      short: [
+        // straight to the drop
+        { roles: ['verse', 'climax'], sequence: [0, 1, 0, 1] },
+        { roles: ['verse', 'breakdown'], sequence: [0, 0, 1, 0] },
+      ],
+      long: [
+        // intro, build, drop drop, breakdown, build, drop drop
+        { roles: ['verse', 'bridge', 'climax', 'breakdown'], sequence: [0, 1, 2, 2, 3, 1, 2, 2] },
+        { roles: ['verse', 'climax', 'breakdown'], sequence: [0, 0, 1, 1, 2, 1, 1] },
+      ],
+      epic: [
+        // full arrangement: two drops with a long pad breakdown between
+        { roles: ['verse', 'bridge', 'climax', 'breakdown'], sequence: [0, 0, 1, 2, 2, 3, 1, 2, 2, 0] },
+        { roles: ['verse', 'contrast', 'climax', 'breakdown'], sequence: [0, 1, 0, 2, 2, 3, 1, 2, 2, 3] },
+      ],
+    },
+    fxChance: 0.35,
+  },
+
   punk: {
     bpmRange: [160, 185],
     preferredScales: ['major', 'mixolydian'],

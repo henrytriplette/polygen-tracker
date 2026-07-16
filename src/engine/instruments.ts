@@ -430,6 +430,141 @@ const VIBE_TRAITS: Record<VibeName, Record<ChannelRole, VibeTraitConfig>> = {
     },
   },
 
+  techno: {
+    lead: {
+      archetypeWeights: [1, 2, 3, 1, 0],  // nasal/narrow pulse stabs
+      traitPool:    ['staccato', 'clean', 'crushed'],
+      traitWeights: [3,          3,       1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 1, 0, 0, 4],  // buzzy hypnotic stabs
+      traitPool:    ['staccato', 'clean'],
+      traitWeights: [3,          2],
+      traitCount: [1, 1],
+    },
+    bass: {
+      archetypeWeights: [0, 2, 1, 4],  // rumbling sub
+      traitPool:    ['clean', 'staccato'],
+      traitWeights: [3,       2],
+      traitCount: [0, 1],
+    },
+    drums: {
+      archetypeWeights: [1, 4, 0, 1, 2],  // tight, machine-precise
+      traitPool:    ['aggressive', 'clean'],
+      traitWeights: [2,            3],
+      traitCount: [0, 1],
+    },
+  },
+
+  dub: {
+    lead: {
+      archetypeWeights: [1, 0, 0, 0, 4],  // melodica-ish soft sine
+      traitPool:    ['echoed', 'soft', 'legato', 'vibrato'],
+      traitWeights: [4,        2,      2,        1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 1, 3, 3, 0],  // skanking pads in space
+      traitPool:    ['echoed', 'soft', 'staccato'],
+      traitWeights: [4,        2,      2],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [2, 0, 0, 4],  // heavyweight sub
+      traitPool:    ['legato', 'soft', 'clean'],
+      traitWeights: [3,        2,      2],
+      traitCount: [0, 1],
+    },
+    drums: {
+      archetypeWeights: [1, 0, 4, 0, 1],  // boomy, cavernous
+      traitPool:    ['echoed', 'soft'],
+      traitWeights: [4,        2],
+      traitCount: [1, 2],
+    },
+  },
+
+  idm: {
+    lead: {
+      archetypeWeights: [1, 2, 1, 1, 2],  // anything goes
+      traitPool:    ['wobbly', 'crushed', 'pitchDrop', 'vibrato', 'echoed'],
+      traitWeights: [3,        2,         2,           1,         1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [1, 1, 2, 2, 1],  // detuned-feeling pads
+      traitPool:    ['wobbly', 'echoed', 'soft'],
+      traitWeights: [3,        2,        2],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [1, 1, 1, 2],  // mutating low end
+      traitPool:    ['crushed', 'clean', 'staccato', 'wobbly'],
+      traitWeights: [2,         2,       2,          1],
+      traitCount: [1, 2],
+    },
+    drums: {
+      archetypeWeights: [1, 1, 0, 3, 2],  // crunched + metallic
+      traitPool:    ['crushed', 'aggressive', 'clean'],
+      traitWeights: [3,         1,            2],
+      traitCount: [0, 2],
+    },
+  },
+
+  hardcore: {
+    lead: {
+      archetypeWeights: [2, 1, 0, 4, 0],  // hoover-adjacent saw screech
+      traitPool:    ['aggressive', 'crushed', 'fastVibrato', 'pitchDrop'],
+      traitWeights: [3,            2,         2,             1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 4, 0, 0, 3],  // saw wall + buzz
+      traitPool:    ['aggressive', 'crushed', 'staccato'],
+      traitWeights: [3,            2,         2],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [0, 3, 4, 0],  // distorted saw/square rumble
+      traitPool:    ['aggressive', 'crushed', 'staccato'],
+      traitWeights: [3,            2,         2],
+      traitCount: [1, 2],
+    },
+    drums: {
+      archetypeWeights: [0, 2, 1, 4, 1],  // the crushed gabber kick
+      traitPool:    ['aggressive', 'crushed'],
+      traitWeights: [3,            2],
+      traitCount: [1, 2],
+    },
+  },
+
+  dnb: {
+    lead: {
+      archetypeWeights: [1, 2, 0, 1, 3],  // liquid keys / airy pulse
+      traitPool:    ['legato', 'echoed', 'vibrato', 'clean'],
+      traitWeights: [3,        2,        1,         2],
+      traitCount: [0, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 1, 3, 3, 0],  // wide pads over the break
+      traitPool:    ['legato', 'soft', 'echoed'],
+      traitWeights: [3,        2,      2],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [0, 1, 4, 2],  // reese-style saw / sub blend
+      traitPool:    ['legato', 'wobbly', 'clean'],
+      traitWeights: [3,        2,        2],
+      traitCount: [1, 2],
+    },
+    drums: {
+      archetypeWeights: [1, 4, 0, 1, 1],  // fast, snappy break kit
+      traitPool:    ['aggressive', 'clean'],
+      traitWeights: [2,            3],
+      traitCount: [0, 1],
+    },
+  },
+
   punk: {
     lead: {
       archetypeWeights: [3, 1, 0, 3, 0],  // square + saw, wall of buzz
@@ -488,12 +623,22 @@ function buildInstrument(
   return params;
 }
 
+const CHANNEL_ROLES: ChannelRole[] = ['lead', 'harmony', 'bass', 'drums'];
+
+const ROLE_ARCHETYPES: Record<ChannelRole, Archetype[]> = {
+  lead: LEAD_ARCHETYPES,
+  harmony: HARMONY_ARCHETYPES,
+  bass: BASS_ARCHETYPES,
+  drums: DRUM_ARCHETYPES,
+};
+
+// Build one channel's instrument from a specific vibe — used when a channel
+// has its own vibe override.
+export function generateInstrumentForChannel(vibe: VibeName, channelIndex: number): ZzFXSound {
+  const role = CHANNEL_ROLES[channelIndex] ?? 'lead';
+  return buildInstrument(ROLE_ARCHETYPES[role], VIBE_TRAITS[vibe][role]);
+}
+
 export function generateInstruments(vibe: VibeName): ZzFXSound[] {
-  const vibeTraits = VIBE_TRAITS[vibe];
-  return [
-    buildInstrument(LEAD_ARCHETYPES, vibeTraits.lead),
-    buildInstrument(HARMONY_ARCHETYPES, vibeTraits.harmony),
-    buildInstrument(BASS_ARCHETYPES, vibeTraits.bass),
-    buildInstrument(DRUM_ARCHETYPES, vibeTraits.drums),
-  ];
+  return CHANNEL_ROLES.map((_, ch) => generateInstrumentForChannel(vibe, ch));
 }

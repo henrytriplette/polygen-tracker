@@ -7,11 +7,12 @@ import {
   PatternLabel,
   PatternEffects,
   ChannelEffects,
+  ChannelVibes,
   NoteEffect,
   VibeName,
 } from './types';
 import { VIBE_CONFIG, getRandomBpm } from './vibes';
-import { generateInstruments } from './instruments';
+import { generateInstruments, generateInstrumentForChannel } from './instruments';
 import { generateDrumPattern } from './drums';
 import { generateBassPattern } from './bass';
 import { generateMelodyPattern } from './melody';
@@ -42,24 +43,35 @@ const ROLE_BASS_MULTIPLIER: Record<SectionRole, number> = {
   climax: 1.2,
 };
 
+// Resolve the vibe a channel should use: its override, or the song's vibe.
+function vibeAt(config: SongConfig, channelVibes: ChannelVibes | undefined, ch: number): VibeName {
+  return channelVibes?.[ch] ?? config.vibe;
+}
+
 function generatePatternForRole(
   config: SongConfig,
   role: SectionRole,
+  channelVibes?: ChannelVibes,
 ): { pattern: Pattern; effects: PatternEffects } {
-  const vibeConfig = VIBE_CONFIG[config.vibe];
+  const melodyVibe = vibeAt(config, channelVibes, 0);
+  const harmonyVibe = vibeAt(config, channelVibes, 1);
+  const bassVibe = vibeAt(config, channelVibes, 2);
+  const drumVibe = vibeAt(config, channelVibes, 3);
 
-  // Generate chord progression — contrast/bridge/climax get fresh progressions
-  const progression = generateChordProgression(config.vibe, config.key, config.scale);
+  // Chord progression flavor follows the harmony channel's vibe — the key and
+  // scale stay global, so every channel remains harmonically locked.
+  const progression = generateChordProgression(harmonyVibe, config.key, config.scale);
 
   // Drums always play (backbone of every section)
-  const { channelData: drumChannel, kickPattern } = generateDrumPattern(config.vibe);
+  const { channelData: drumChannel, kickPattern } = generateDrumPattern(drumVibe);
 
-  // Apply role-based density scaling
-  const melodyDensity = Math.min(1, vibeConfig.melodyDensity * ROLE_MELODY_MULTIPLIER[role]);
+  // Apply role-based density scaling, per-channel vibe densities
+  const melodyDensity = Math.min(1, VIBE_CONFIG[melodyVibe].melodyDensity * ROLE_MELODY_MULTIPLIER[role]);
   const bassDensityScale = ROLE_BASS_MULTIPLIER[role];
+  const bassDensity = VIBE_CONFIG[bassVibe].bassDensity;
   const scaledBassDensity: [number, number] = [
-    Math.round(vibeConfig.bassDensity[0] * bassDensityScale),
-    Math.round(vibeConfig.bassDensity[1] * bassDensityScale),
+    Math.round(bassDensity[0] * bassDensityScale),
+    Math.round(bassDensity[1] * bassDensityScale),
   ];
 
   // Breakdown: silent lead + harmony
@@ -67,10 +79,10 @@ function generatePatternForRole(
     const silentChannel = [0, 0, ...Array(ROWS).fill(0)];
     const bassChannel = generateBassPattern(
       config.key, config.scale, kickPattern,
-      scaledBassDensity, config.vibe, progression
+      scaledBassDensity, bassVibe, progression
     );
     const pattern = [silentChannel, silentChannel, bassChannel, drumChannel] as Pattern;
-    const effects = generatePatternEffects(pattern, config, role);
+    const effects = generatePatternEffects(pattern, config, role, channelVibes);
     return { pattern, effects };
   }
 
@@ -82,7 +94,7 @@ function generatePatternForRole(
   // Bass
   const bassChannel = generateBassPattern(
     config.key, config.scale, kickPattern,
-    scaledBassDensity, config.vibe, progression
+    scaledBassDensity, bassVibe, progression
   );
 
   // Harmony
@@ -101,7 +113,7 @@ function generatePatternForRole(
   }
 
   const pattern = [melodyChannel, harmonyChannel, bassChannel, drumChannel] as Pattern;
-  const effects = generatePatternEffects(pattern, config, role);
+  const effects = generatePatternEffects(pattern, config, role, channelVibes);
   return { pattern, effects };
 }
 
@@ -109,7 +121,7 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function generateSong(config?: Partial<SongConfig>): Song {
+export function generateSong(config?: Partial<SongConfig>, channelVibes?: ChannelVibes): Song {
   const vibe: VibeName = config?.vibe ?? 'adventure';
   const vibeConfig = VIBE_CONFIG[vibe];
   const length: SongLength = config?.length ?? 'long';
@@ -123,7 +135,10 @@ export function generateSong(config?: Partial<SongConfig>): Song {
     length,
   };
 
-  const instruments = generateInstruments(vibe);
+  const vibes: ChannelVibes = channelVibes ?? [null, null, null, null];
+  const instruments = [0, 1, 2, 3].map((ch) =>
+    generateInstrumentForChannel(vibes[ch] ?? vibe, ch)
+  );
 
   // Pick a structure template for this vibe + length
   const template = pick(vibeConfig.structures[length]);
@@ -137,7 +152,7 @@ export function generateSong(config?: Partial<SongConfig>): Song {
   for (let i = 0; i < template.roles.length; i++) {
     const label = PATTERN_LABELS[i];
     const role = template.roles[i];
-    const { pattern, effects } = generatePatternForRole(fullConfig, role);
+    const { pattern, effects } = generatePatternForRole(fullConfig, role, vibes);
     patterns[label] = pattern;
     patternRoles[label] = role;
     patternEffects[label] = effects;
@@ -152,6 +167,7 @@ export function generateSong(config?: Partial<SongConfig>): Song {
     patternEffects,
     sequence: [...template.sequence],
     patternOrder,
+    channelVibes: vibes,
   };
 }
 
@@ -161,14 +177,17 @@ export function generateSong(config?: Partial<SongConfig>): Song {
  * BPM is re-rolled from the new vibe's preferred range.
  */
 export function regenerateForVibe(song: Song, newVibe: VibeName): Song {
-  return generateSong({
-    name: song.config.name,
-    vibe: newVibe,
-    key: song.config.key,
-    scale: song.config.scale,
-    bpm: getRandomBpm(newVibe),
-    length: song.config.length,
-  });
+  return generateSong(
+    {
+      name: song.config.name,
+      vibe: newVibe,
+      key: song.config.key,
+      scale: song.config.scale,
+      bpm: getRandomBpm(newVibe),
+      length: song.config.length,
+    },
+    song.channelVibes
+  );
 }
 
 /**
@@ -185,7 +204,7 @@ export function regenerateAllPatterns(
 
   for (const label of song.patternOrder) {
     const role = song.patternRoles[label] ?? 'verse';
-    const { pattern, effects } = generatePatternForRole(newConfig, role);
+    const { pattern, effects } = generatePatternForRole(newConfig, role, song.channelVibes);
     patterns[label] = pattern;
     patternEffects[label] = effects;
   }
@@ -218,7 +237,7 @@ export function regenerateWithNewLength(
   for (let i = 0; i < template.roles.length; i++) {
     const label = PATTERN_LABELS[i];
     const role = template.roles[i];
-    const { pattern, effects } = generatePatternForRole(newConfig, role);
+    const { pattern, effects } = generatePatternForRole(newConfig, role, song.channelVibes);
     patterns[label] = pattern;
     patternRoles[label] = role;
     patternEffects[label] = effects;
@@ -241,7 +260,7 @@ export function regeneratePattern(
   patternLabel: PatternLabel
 ): { pattern: Pattern; effects: PatternEffects } {
   const role = song.patternRoles[patternLabel] ?? 'verse';
-  return generatePatternForRole(song.config, role);
+  return generatePatternForRole(song.config, role, song.channelVibes);
 }
 
 export function regenerateChannel(
@@ -250,11 +269,14 @@ export function regenerateChannel(
   channelIndex: number
 ): { pattern: Pattern; effects: PatternEffects } {
   const pattern = [...song.patterns[patternLabel]] as Pattern;
-  const vibeConfig = VIBE_CONFIG[song.config.vibe];
   const role = song.patternRoles[patternLabel] ?? 'verse';
+  const channelVibe = vibeAt(song.config, song.channelVibes, channelIndex);
+  const channelVibeConfig = VIBE_CONFIG[channelVibe];
 
+  // Progression flavor follows the harmony channel's vibe, matching
+  // generatePatternForRole so regenerated channels stay stylistically aligned.
   const progression = generateChordProgression(
-    song.config.vibe, song.config.key, song.config.scale
+    vibeAt(song.config, song.channelVibes, 1), song.config.key, song.config.scale
   );
 
   const melodyMult = ROLE_MELODY_MULTIPLIER[role];
@@ -267,7 +289,7 @@ export function regenerateChannel(
       } else {
         pattern[0] = generateMelodyPattern(
           song.config.key, song.config.scale,
-          Math.min(1, vibeConfig.melodyDensity * melodyMult),
+          Math.min(1, channelVibeConfig.melodyDensity * melodyMult),
           progression
         );
       }
@@ -289,15 +311,15 @@ export function regenerateChannel(
       pattern[2] = generateBassPattern(
         song.config.key, song.config.scale, kickPattern,
         [
-          Math.round(vibeConfig.bassDensity[0] * bassMult),
-          Math.round(vibeConfig.bassDensity[1] * bassMult),
+          Math.round(channelVibeConfig.bassDensity[0] * bassMult),
+          Math.round(channelVibeConfig.bassDensity[1] * bassMult),
         ],
-        song.config.vibe, progression
+        channelVibe, progression
       );
       break;
     }
     case 3: {
-      const { channelData } = generateDrumPattern(song.config.vibe);
+      const { channelData } = generateDrumPattern(channelVibe);
       pattern[3] = channelData;
       break;
     }
@@ -312,10 +334,38 @@ export function regenerateChannel(
     existingEffects?.[3] ?? Array(ROWS).fill(null),
   ];
   effects[channelIndex] = generateChannelEffects(
-    channelIndex, pattern[channelIndex].slice(2), song.config, role
+    channelIndex, pattern[channelIndex].slice(2), song.config, role, channelVibe
   );
 
   return { pattern, effects };
+}
+
+/**
+ * Set (or clear, with null) one channel's vibe override. Regenerates that
+ * channel's instrument and its notes in every pattern so the new style is
+ * immediately audible; the other channels are untouched.
+ */
+export function applyChannelVibe(song: Song, channelIndex: number, vibe: VibeName | null): Song {
+  const channelVibes = [...(song.channelVibes ?? [null, null, null, null])] as ChannelVibes;
+  channelVibes[channelIndex] = vibe;
+
+  const instruments = song.instruments.map(i => [...i]);
+  instruments[channelIndex] = generateInstrumentForChannel(
+    vibe ?? song.config.vibe, channelIndex
+  );
+
+  let next: Song = { ...song, channelVibes, instruments };
+
+  for (const label of next.patternOrder) {
+    const { pattern, effects } = regenerateChannel(next, label, channelIndex);
+    next = {
+      ...next,
+      patterns: { ...next.patterns, [label]: pattern },
+      patternEffects: { ...next.patternEffects, [label]: effects },
+    };
+  }
+
+  return next;
 }
 
 // --- CHANNEL EXPANSION ---

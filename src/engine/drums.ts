@@ -39,6 +39,66 @@ const KICK_TEMPLATES: Record<VibeName, { base: number[]; ghostChance: number; gh
     ghostChance: 0.15,
     ghostPositions: [4, 12, 20, 28],
   },
+  synthwave: {
+    // Steady four-on-floor, occasional pickup into the next bar
+    base: [0, 8, 16, 24],
+    ghostChance: 0.15,
+    ghostPositions: [14, 30],
+  },
+  house: {
+    // Relentless four-on-floor — the genre's heartbeat
+    base: [0, 8, 16, 24],
+    ghostChance: 0.05,
+    ghostPositions: [30],
+  },
+  lofi: {
+    // Boom-bap: kick on the one, lazy off-grid follow-ups
+    base: [0, 10, 16, 26],
+    ghostChance: 0.25,
+    ghostPositions: [6, 20],
+  },
+  funk: {
+    // Emphasis on The One, syncopated 16th pickups
+    base: [0, 10, 16, 22],
+    ghostChance: 0.3,
+    ghostPositions: [6, 26, 30],
+  },
+  punk: {
+    // Flat-out eighth-note kicks
+    base: [0, 4, 8, 12, 16, 20, 24, 28],
+    ghostChance: 0.1,
+    ghostPositions: [2, 18],
+  },
+  techno: {
+    // Unwavering four-on-the-floor, machine-strict
+    base: [0, 8, 16, 24],
+    ghostChance: 0.1,
+    ghostPositions: [30],
+  },
+  dub: {
+    // Steppers-meets-one-drop: weight on 1 and the drop on 3
+    base: [0, 16],
+    ghostChance: 0.3,
+    ghostPositions: [24, 28],
+  },
+  idm: {
+    // Deliberately broken grid — syncopated anchors, chaotic ghosts
+    base: [0, 6, 16, 26],
+    ghostChance: 0.45,
+    ghostPositions: [10, 12, 20, 30],
+  },
+  hardcore: {
+    // Relentless gabber stomp: kick every half-beat
+    base: [0, 4, 8, 12, 16, 20, 24, 28],
+    ghostChance: 0.2,
+    ghostPositions: [2, 10, 18, 26],
+  },
+  dnb: {
+    // Two-step: kick on the one and the off-kilter pickup
+    base: [0, 10],
+    ghostChance: 0.35,
+    ghostPositions: [20, 26, 30],
+  },
 };
 
 // Snare: probability-weighted template selection (SynthyCraft technique)
@@ -72,6 +132,73 @@ function generateSnareHits(vibe: VibeName): number[] {
         for (let i = 0; i < ROWS; i++) { if (euc[i]) hits.push(i); }
       }
       break;
+    case 'synthwave':
+      // Big gated snare on the backbeat, occasionally doubled before bar end
+      if (p < 0.75) { hits.push(8, 24); }
+      else if (p < 0.9) { hits.push(8, 24, 30); } // fill into next bar
+      else { hits.push(8, 20, 24); }
+      break;
+    case 'house':
+      // Clap on 2 and 4, sometimes an extra skip clap
+      if (p < 0.7) { hits.push(8, 24); }
+      else if (p < 0.9) { hits.push(8, 24, 28); } // skipped clap
+      else { hits.push(8, 24, 14); }
+      break;
+    case 'lofi':
+      // Lazy backbeat, sometimes dragging late
+      if (p < 0.7) { hits.push(8, 24); }
+      else if (p < 0.9) { hits.push(9, 24); } // dragged snare
+      else { hits.push(8, 25); }
+      break;
+    case 'funk':
+      // Backbeat plus ghost-note chatter
+      if (p < 0.5) { hits.push(8, 24); }
+      else if (p < 0.8) { hits.push(8, 24, 14, 30); } // ghosted 16ths
+      else { hits.push(4, 12, 20, 28); } // displaced
+      break;
+    case 'punk':
+      // Hard backbeat or all-out double-time
+      if (p < 0.5) { hits.push(8, 24); }
+      else if (p < 0.85) { hits.push(4, 12, 20, 28); } // double-time thrash
+      else { hits.push(8, 24, 28, 30); } // fill into the repeat
+      break;
+    case 'techno':
+      // Minimal: sparse claps, sometimes none at all — the kick is the music
+      if (p < 0.5) { hits.push(8, 24); }
+      else if (p < 0.8) { hits.push(24); } // single late clap
+      // else: no snare — pure kick hypnosis
+      break;
+    case 'dub':
+      // Rimshot on the drop, ends drifting in delay
+      if (p < 0.6) { hits.push(8, 24); }
+      else if (p < 0.85) { hits.push(24); } // sparse, spacious
+      else { hits.push(8, 24, 26); } // delay-tail feel
+      break;
+    case 'idm':
+      // Programmed chaos: euclidean scatters or displaced backbeats
+      if (p < 0.4) {
+        const euc = euclidean(5, 32, Math.floor(Math.random() * 16));
+        for (let i = 0; i < ROWS; i++) { if (euc[i]) hits.push(i); }
+      } else if (p < 0.7) {
+        const euc = euclidean(7, 32, Math.floor(Math.random() * 16));
+        for (let i = 0; i < ROWS; i++) { if (euc[i]) hits.push(i); }
+      } else { hits.push(6, 14, 22, 30); } // displaced backbeat
+      break;
+    case 'hardcore':
+      // Offbeat stabs riding the kick wall
+      if (p < 0.5) { hits.push(4, 12, 20, 28); }
+      else if (p < 0.8) { hits.push(8, 24); }
+      else {
+        const euc = euclidean(5, 32, Math.floor(Math.random() * 8));
+        for (let i = 0; i < ROWS; i++) { if (euc[i]) hits.push(i); }
+      }
+      break;
+    case 'dnb':
+      // The break: snare on 2 and 4, with chopped variations
+      if (p < 0.6) { hits.push(8, 24); }
+      else if (p < 0.85) { hits.push(8, 24, 30); } // chopped tail
+      else { hits.push(8, 20, 24); } // shuffled mid hit
+      break;
   }
   return hits;
 }
@@ -100,6 +227,16 @@ const HAT_DENSITY: Record<VibeName, number> = {
   dungeon: 0.3,
   titleScreen: 0.5,
   boss: 0.7,
+  synthwave: 0.55,
+  house: 0.85, // offbeat hats carry the pump
+  lofi: 0.35,
+  funk: 0.75,
+  punk: 0.8,
+  techno: 0.9, // ticking offbeats fill everything the kick leaves
+  dub: 0.4,
+  idm: 0.55,
+  hardcore: 0.7,
+  dnb: 0.65,
 };
 
 export function generateDrumPattern(vibe: VibeName): {

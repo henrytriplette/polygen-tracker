@@ -1,5 +1,5 @@
-export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, songToZzfxm, renderSongBuffers } from './song';
-export { generateInstruments } from './instruments';
+export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, applyChannelVibe, songToZzfxm, renderSongBuffers } from './song';
+export { generateInstruments, generateInstrumentForChannel } from './instruments';
 export { ZZFX, zzfxP, zzfxMChannels, unlockAudio, getAnalyser, floatsToWav } from './zzfx';
 export { AudioGraph } from './audioGraph';
 export { CHROMATIC, SCALES, getScaleNotes, zzfxmToNoteName } from './scales';
@@ -18,6 +18,7 @@ export type {
   PatternLabel,
   PatternEffects,
   ChannelEffects,
+  ChannelVibes,
   NoteEffect,
   EffectCode,
   NoteName,

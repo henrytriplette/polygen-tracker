@@ -12,7 +12,12 @@ export type VibeName =
   | 'house'
   | 'lofi'
   | 'funk'
-  | 'punk';
+  | 'punk'
+  | 'techno'
+  | 'dub'
+  | 'idm'
+  | 'hardcore'
+  | 'dnb';
 
 export type PatternLabel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
@@ -83,6 +88,10 @@ export interface SongConfig {
   length: SongLength;
 }
 
+// Per-channel vibe override: null = follow the song's vibe.
+// Order matches the channels: [lead, harmony, bass, drums].
+export type ChannelVibes = [VibeName | null, VibeName | null, VibeName | null, VibeName | null];
+
 export interface Song {
   config: SongConfig;
   instruments: ZzFXSound[];
@@ -91,6 +100,7 @@ export interface Song {
   patternEffects: Record<PatternLabel, PatternEffects>;
   sequence: number[];
   patternOrder: PatternLabel[];
+  channelVibes?: ChannelVibes;
 }
 
 export interface ScaleNote {

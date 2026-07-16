@@ -2,6 +2,7 @@ import { reactive, computed } from 'vue';
 import {
   AudioGraph,
   ZZFX,
+  applyChannelVibe,
   floatsToWav,
   generateSong,
   getRandomBpm,
@@ -16,6 +17,50 @@ import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } fr
 import { downloadPolyendProject, sanitizeProjectName } from './export/polyend';
 
 export const CHANNEL_LABELS = ['LEAD', 'HARM', 'BASS', 'DRUM'] as const;
+
+export interface VibeOption {
+  value: VibeName;
+  label: string;
+}
+
+export const VIBE_GROUPS: { label: string; vibes: VibeOption[] }[] = [
+  {
+    label: 'GAME',
+    vibes: [
+      { value: 'adventure', label: 'ADVENTURE' },
+      { value: 'battle', label: 'BATTLE' },
+      { value: 'dungeon', label: 'DUNGEON' },
+      { value: 'titleScreen', label: 'TITLE' },
+      { value: 'boss', label: 'BOSS' },
+    ],
+  },
+  {
+    label: 'ELECTRONIC',
+    vibes: [
+      { value: 'synthwave', label: 'SYNTHWAVE' },
+      { value: 'house', label: 'HOUSE' },
+      { value: 'techno', label: 'TECHNO' },
+      { value: 'dub', label: 'DUB' },
+      { value: 'idm', label: 'IDM' },
+      { value: 'hardcore', label: 'HARDCORE' },
+      { value: 'dnb', label: 'DNB' },
+    ],
+  },
+  {
+    label: 'CLASSICS',
+    vibes: [
+      { value: 'lofi', label: 'LO-FI' },
+      { value: 'funk', label: 'FUNK' },
+      { value: 'punk', label: 'PUNK' },
+    ],
+  },
+];
+
+export const VIBE_OPTIONS: VibeOption[] = VIBE_GROUPS.flatMap((g) => g.vibes);
+
+export function vibeLabel(vibe: VibeName): string {
+  return VIBE_OPTIONS.find((v) => v.value === vibe)?.label ?? vibe.toUpperCase();
+}
 
 interface StoreState {
   song: Song;
@@ -139,7 +184,10 @@ export const store = {
   },
 
   newSong(): void {
-    state.song = generateSong({ vibe: state.song.config.vibe, length: state.song.config.length });
+    state.song = generateSong(
+      { vibe: state.song.config.vibe, length: state.song.config.length },
+      state.song.channelVibes
+    );
     state.selectedPattern = state.song.patternOrder[0];
     afterSongChange();
   },
@@ -191,6 +239,11 @@ export const store = {
       patterns: { ...state.song.patterns, [label]: pattern },
       patternEffects: { ...state.song.patternEffects, [label]: effects },
     };
+    swapAudio();
+  },
+
+  setChannelVibe(ch: number, vibe: VibeName | null): void {
+    state.song = applyChannelVibe(state.song, ch, vibe);
     swapAudio();
   },
 

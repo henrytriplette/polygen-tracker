@@ -117,6 +117,66 @@ const VIBE_CHANNEL_FX: Record<VibeName, EffectCode[][]> = {
     ['ST', 'PD'],  // bass: staccato hits, pitch drops on roots
     ['PD', 'BC'],  // drums: heavy kick punch + crushed snares
   ],
+  synthwave: [
+    ['VB', 'SU'],  // lead: singing vibrato, scoops into held notes
+    ['VB'],        // harmony: slow pad shimmer
+    ['SD'],        // bass: resolution slides
+    ['PD'],        // drums: punchy gated kicks
+  ],
+  house: [
+    ['ST', 'SU'],  // lead: tight stabs, filter-sweep-style rises
+    ['ST'],        // harmony: choppy chord stabs
+    ['ST'],        // bass: pumping staccato
+    ['PD', 'BC'],  // drums: kick thump + crunchy claps
+  ],
+  lofi: [
+    ['VB', 'SD'],  // lead: wow/flutter warble, lazy falls
+    ['VB'],        // harmony: tape-warble pads
+    ['SD'],        // bass: relaxed slides down
+    ['BC'],        // drums: dusty crunch
+  ],
+  funk: [
+    ['ST', 'SU'],  // lead: clipped clav hits, grace-note scoops
+    ['ST'],        // harmony: tight rhythm chops
+    ['ST', 'SD'],  // bass: percussive pocket, slide-downs
+    ['PD', 'BC'],  // drums: punchy kicks, cracking snares
+  ],
+  punk: [
+    ['ST', 'PD'],  // lead: shouted staccato, dive-bomb drops
+    ['ST'],        // harmony: chugging power chords
+    ['ST'],        // bass: relentless downpicked eighths
+    ['PD', 'BC'],  // drums: slammed kicks + blown-out snares
+  ],
+  techno: [
+    ['ST', 'SU'],  // lead: clipped stabs, filter-rise gestures
+    ['ST'],        // harmony: hypnotic chopped chords
+    ['ST'],        // bass: tight machine pulse
+    ['PD', 'BC'],  // drums: punched kicks, gritty percussion
+  ],
+  dub: [
+    ['VB', 'SD'],  // lead: tape-wobble melodica, lazy falls
+    ['VB'],        // harmony: swimming skank chords
+    ['SD'],        // bass: sliding heavyweight lines
+    ['PD'],        // drums: deep kick bloom
+  ],
+  idm: [
+    ['PD', 'DT'],  // lead: pitch mangling, timbre flips
+    ['DT'],        // harmony: waveform morphs
+    ['ST', 'PD'],  // bass: chopped, bent low end
+    ['BC', 'PD'],  // drums: bit-crushed hits, warped kicks
+  ],
+  hardcore: [
+    ['PD', 'SU'],  // lead: sirens and dive-bombs
+    ['DT', 'ST'],  // harmony: hoover grit, chopped stabs
+    ['ST', 'PD'],  // bass: hammering staccato
+    ['PD', 'BC'],  // drums: overdriven kick punch + crushed snares
+  ],
+  dnb: [
+    ['VB', 'SU'],  // lead: liquid shimmer, rises
+    ['VB'],        // harmony: pad movement
+    ['SD', 'ST'],  // bass: reese slides, chops
+    ['PD', 'BC'],  // drums: kick weight + crunched break
+  ],
 };
 
 // How many effects per channel per pattern, by role.
@@ -230,6 +290,7 @@ export function generateChannelEffects(
   notes: number[],
   config: SongConfig,
   role: SectionRole,
+  vibeOverride?: VibeName,
 ): ChannelEffects {
   if (channelIndex >= CHANNEL_FX_POOLS.length) return Array(32).fill(null);
   const pool = CHANNEL_FX_POOLS[channelIndex];
@@ -239,7 +300,7 @@ export function generateChannelEffects(
   if (budget <= 0) return Array(32).fill(null);
 
   // Get this vibe's ranked effects for this channel
-  const vibePrefs = VIBE_CHANNEL_FX[config.vibe][channelIndex];
+  const vibePrefs = VIBE_CHANNEL_FX[vibeOverride ?? config.vibe][channelIndex];
   if (!vibePrefs || vibePrefs.length === 0) return Array(32).fill(null);
 
   // Drums use a separate placement strategy based on drum type
@@ -359,11 +420,12 @@ export function generatePatternEffects(
   pattern: Pattern,
   config: SongConfig,
   role: SectionRole,
+  channelVibes?: (VibeName | null)[],
 ): PatternEffects {
   return [
-    generateChannelEffects(0, pattern[0].slice(2), config, role),
-    generateChannelEffects(1, pattern[1].slice(2), config, role),
-    generateChannelEffects(2, pattern[2].slice(2), config, role),
-    generateChannelEffects(3, pattern[3].slice(2), config, role),
+    generateChannelEffects(0, pattern[0].slice(2), config, role, channelVibes?.[0] ?? undefined),
+    generateChannelEffects(1, pattern[1].slice(2), config, role, channelVibes?.[1] ?? undefined),
+    generateChannelEffects(2, pattern[2].slice(2), config, role, channelVibes?.[2] ?? undefined),
+    generateChannelEffects(3, pattern[3].slice(2), config, role, channelVibes?.[3] ?? undefined),
   ];
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { store } from './store';
+import { store, VIBE_GROUPS } from './store';
 import { CHROMATIC } from './engine';
 import type { NoteName, ScaleName, SongLength, VibeName } from './engine';
 import SequenceBar from './components/SequenceBar.vue';
@@ -7,13 +7,9 @@ import TrackerGrid from './components/TrackerGrid.vue';
 
 const state = store.state;
 
-const VIBES: { value: VibeName; label: string }[] = [
-  { value: 'adventure', label: 'ADVENTURE' },
-  { value: 'battle', label: 'BATTLE' },
-  { value: 'dungeon', label: 'DUNGEON' },
-  { value: 'titleScreen', label: 'TITLE' },
-  { value: 'boss', label: 'BOSS' },
-];
+function onVibe(e: Event) {
+  store.setVibe((e.target as HTMLSelectElement).value as VibeName);
+}
 
 const SCALES: ScaleName[] = ['major', 'minor', 'pentatonic', 'dorian', 'mixolydian', 'harmonicMinor'];
 const LENGTHS: SongLength[] = ['short', 'long', 'epic'];
@@ -48,15 +44,14 @@ function onName(e: Event) {
     </header>
 
     <section class="bar controls">
-      <div class="ctl vibes">
-        <button
-          v-for="v in VIBES"
-          :key="v.value"
-          class="btn vibe"
-          :class="{ active: state.song.config.vibe === v.value }"
-          @click="store.setVibe(v.value)"
-        >{{ v.label }}</button>
-      </div>
+      <label class="ctl">
+        <span>VIBE</span>
+        <select class="vibe-select" :value="state.song.config.vibe" @change="onVibe">
+          <optgroup v-for="g in VIBE_GROUPS" :key="g.label" :label="g.label">
+            <option v-for="v in g.vibes" :key="v.value" :value="v.value">{{ v.label }}</option>
+          </optgroup>
+        </select>
+      </label>
 
       <label class="ctl">
         <span>KEY</span>
@@ -164,7 +159,11 @@ function onName(e: Event) {
   color: var(--text-dim);
 }
 
-.vibes { display: flex; gap: 2px; }
+.vibe-select {
+  min-width: 130px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 select,
 .bpm {
@@ -207,14 +206,6 @@ select,
 
 .btn.play.active,
 .btn.play:hover { background: var(--ch-lead); color: #000; }
-
-.btn.vibe { font-size: 11px; padding: 4px 8px; }
-
-.btn.vibe.active {
-  background: var(--accent);
-  color: #000;
-  border-color: var(--accent);
-}
 
 .btn.mini { padding: 3px 6px; font-size: 11px; }
 
