@@ -321,6 +321,141 @@ const VIBE_TRAITS: Record<VibeName, Record<ChannelRole, VibeTraitConfig>> = {
       traitCount: [0, 1],
     },
   },
+
+  synthwave: {
+    lead: {
+      archetypeWeights: [1, 1, 0, 4, 1],  // bright saw hero lead
+      traitPool:    ['legato', 'vibrato', 'echoed', 'pitchBend', 'clean'],
+      traitWeights: [3,        2,         2,        1,           1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 2, 3, 3, 0],  // warm analog-style pads
+      traitPool:    ['legato', 'soft', 'echoed', 'vibrato'],
+      traitWeights: [3,        2,      2,        1],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [0, 3, 3, 1],  // square/saw synth bass, driving
+      traitPool:    ['clean', 'staccato', 'legato'],
+      traitWeights: [3,       2,          1],
+      traitCount: [0, 1],
+    },
+    drums: {
+      archetypeWeights: [3, 2, 1, 0, 2],  // gated 80s snare vibes
+      traitPool:    ['clean', 'echoed'],
+      traitWeights: [3,       2],
+      traitCount: [0, 1],
+    },
+  },
+
+  house: {
+    lead: {
+      archetypeWeights: [2, 3, 2, 1, 0],  // pulse stabs, piano-ish attack
+      traitPool:    ['staccato', 'clean', 'echoed'],
+      traitWeights: [3,          3,       1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 2, 0, 1, 3],  // buzzy organ/stab chords
+      traitPool:    ['staccato', 'clean', 'echoed'],
+      traitWeights: [3,          2,       1],
+      traitCount: [1, 1],
+    },
+    bass: {
+      archetypeWeights: [1, 1, 0, 4],  // deep sub bass
+      traitPool:    ['clean', 'staccato'],
+      traitWeights: [3,       2],
+      traitCount: [0, 1],
+    },
+    drums: {
+      archetypeWeights: [1, 4, 0, 1, 1],  // tight club kit
+      traitPool:    ['aggressive', 'clean'],
+      traitWeights: [2,            3],
+      traitCount: [0, 1],
+    },
+  },
+
+  lofi: {
+    lead: {
+      archetypeWeights: [1, 0, 0, 0, 4],  // mellow sine, keys-like
+      traitPool:    ['soft', 'legato', 'echoed', 'vibrato'],
+      traitWeights: [3,      3,        2,        1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 0, 3, 4, 0],  // hazy pads
+      traitPool:    ['soft', 'legato', 'echoed'],
+      traitWeights: [3,      3,        2],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [3, 0, 0, 3],  // round triangle/sub bass
+      traitPool:    ['soft', 'legato', 'clean'],
+      traitWeights: [3,      2,        2],
+      traitCount: [0, 1],
+    },
+    drums: {
+      archetypeWeights: [1, 0, 4, 2, 0],  // boomy, dusty kit
+      traitPool:    ['soft', 'echoed', 'crushed'],
+      traitWeights: [3,      2,        1],
+      traitCount: [0, 2],
+    },
+  },
+
+  funk: {
+    lead: {
+      archetypeWeights: [1, 3, 3, 1, 0],  // narrow pulses, clav-like bite
+      traitPool:    ['staccato', 'clean', 'pitchBend'],
+      traitWeights: [4,          2,       1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [3, 1, 0, 0, 2],  // tight rhythm stabs
+      traitPool:    ['staccato', 'clean'],
+      traitWeights: [4,          2],
+      traitCount: [1, 1],
+    },
+    bass: {
+      archetypeWeights: [2, 3, 1, 0],  // punchy square/triangle, the pocket
+      traitPool:    ['staccato', 'clean', 'aggressive'],
+      traitWeights: [3,          2,       1],
+      traitCount: [1, 2],
+    },
+    drums: {
+      archetypeWeights: [3, 3, 0, 0, 1],  // crisp and dry
+      traitPool:    ['clean', 'aggressive'],
+      traitWeights: [3,       1],
+      traitCount: [0, 1],
+    },
+  },
+
+  punk: {
+    lead: {
+      archetypeWeights: [3, 1, 0, 3, 0],  // square + saw, wall of buzz
+      traitPool:    ['aggressive', 'crushed', 'staccato', 'clean'],
+      traitWeights: [3,            2,         2,          1],
+      traitCount: [1, 2],
+    },
+    harmony: {
+      archetypeWeights: [0, 3, 0, 0, 3],  // saw + buzzy power-chord grit
+      traitPool:    ['aggressive', 'staccato', 'crushed'],
+      traitWeights: [3,            2,          1],
+      traitCount: [1, 2],
+    },
+    bass: {
+      archetypeWeights: [0, 3, 3, 0],  // square/saw eighth-note wall
+      traitPool:    ['aggressive', 'staccato', 'clean'],
+      traitWeights: [3,            3,          1],
+      traitCount: [1, 2],
+    },
+    drums: {
+      archetypeWeights: [1, 3, 0, 3, 0],  // tight or trashy
+      traitPool:    ['aggressive', 'clean'],
+      traitWeights: [3,            1],
+      traitCount: [0, 1],
+    },
+  },
 };
 
 // --- GENERATION ---

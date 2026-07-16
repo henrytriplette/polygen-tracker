@@ -2,7 +2,17 @@ export type NoteName = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' |
 
 export type ScaleName = 'major' | 'minor' | 'pentatonic' | 'dorian' | 'mixolydian' | 'harmonicMinor';
 
-export type VibeName = 'adventure' | 'battle' | 'dungeon' | 'titleScreen' | 'boss';
+export type VibeName =
+  | 'adventure'
+  | 'battle'
+  | 'dungeon'
+  | 'titleScreen'
+  | 'boss'
+  | 'synthwave'
+  | 'house'
+  | 'lofi'
+  | 'funk'
+  | 'punk';
 
 export type PatternLabel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
