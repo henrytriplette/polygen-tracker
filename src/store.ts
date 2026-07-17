@@ -1,20 +1,55 @@
 import { reactive, computed } from 'vue';
 import {
   AudioGraph,
+  CHORDS_PER_PATTERN,
   ZZFX,
+  applyChannelAlgo,
   applyChannelVibe,
+  applyChordsToPattern,
+  applySongStructure,
   floatsToWav,
   generateSong,
   getRandomBpm,
+  randomProgressionDegrees,
   regenerateAllPatterns,
   regenerateChannel,
   regenerateForVibe,
   regeneratePattern,
   regenerateWithNewLength,
   renderSongBuffers,
+  snapNoteToScale,
+  zzfxP,
 } from './engine';
+import type { ChannelAlgos, Pattern } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
-import { downloadPolyendProject, sanitizeProjectName } from './export/polyend';
+
+// Selectable pattern algorithms per channel (null = AUTO, the vibe default)
+export const CHANNEL_ALGO_OPTIONS: { value: string; label: string }[][] = [
+  [
+    { value: 'walk', label: 'WALK' },
+    { value: 'arp', label: 'ARP' },
+    { value: 'riff', label: 'RIFF' },
+  ],
+  [
+    { value: 'gapfill', label: 'GAPFILL' },
+    { value: 'stabs', label: 'STABS' },
+    { value: 'arp', label: 'ARP' },
+    { value: 'pedal', label: 'PEDAL' },
+  ],
+  [
+    { value: 'groove', label: 'GROOVE' },
+    { value: 'acid', label: 'ACID' },
+    { value: 'arp', label: 'ARP' },
+    { value: 'offbeat', label: 'OFFBEAT' },
+  ],
+  [
+    { value: 'template', label: 'TEMPLATE' },
+    { value: 'euclid', label: 'EUCLID' },
+    { value: 'break', label: 'BREAK' },
+    { value: 'four', label: '4-FLOOR' },
+  ],
+];
+import { downloadPolyendPatterns, downloadPolyendProject, sanitizeProjectName } from './export/polyend';
 
 export const CHANNEL_LABELS = ['LEAD', 'HARM', 'BASS', 'DRUM'] as const;
 
@@ -72,6 +107,7 @@ interface StoreState {
   solo: number | null;
   exportDevice: 8 | 12 | 16;
   isExporting: boolean;
+  snapToScale: boolean;
 }
 
 const state = reactive<StoreState>({
@@ -84,6 +120,7 @@ const state = reactive<StoreState>({
   solo: null,
   exportDevice: 12,
   isExporting: false,
+  snapToScale: true,
 });
 
 let graph: AudioGraph | null = null;
@@ -186,8 +223,16 @@ export const store = {
   newSong(): void {
     state.song = generateSong(
       { vibe: state.song.config.vibe, length: state.song.config.length },
-      state.song.channelVibes
+      state.song.channelVibes,
+      state.song.channelAlgos,
+      state.song.structureId
     );
+    state.selectedPattern = state.song.patternOrder[0];
+    afterSongChange();
+  },
+
+  setStructure(structureId: string | null): void {
+    state.song = applySongStructure(state.song, structureId);
     state.selectedPattern = state.song.patternOrder[0];
     afterSongChange();
   },
@@ -233,18 +278,77 @@ export const store = {
   },
 
   regenPattern(label: PatternLabel): void {
-    const { pattern, effects } = regeneratePattern(state.song, label);
+    const { pattern, effects, degrees } = regeneratePattern(state.song, label);
     state.song = {
       ...state.song,
       patterns: { ...state.song.patterns, [label]: pattern },
       patternEffects: { ...state.song.patternEffects, [label]: effects },
+      patternChords: { ...state.song.patternChords, [label]: degrees } as Song['patternChords'],
     };
     swapAudio();
+  },
+
+  // --- Chord generator ---
+  chordDegrees(): number[] {
+    return (
+      state.song.patternChords?.[state.selectedPattern] ??
+      Array(CHORDS_PER_PATTERN).fill(0)
+    );
+  },
+
+  setChordDegree(slot: number, degree: number): void {
+    const degrees = [...this.chordDegrees()];
+    degrees[slot] = degree;
+    state.song = applyChordsToPattern(state.song, state.selectedPattern, degrees);
+    swapAudio();
+  },
+
+  rollChords(): void {
+    const vibe = state.song.channelVibes?.[1] ?? state.song.config.vibe;
+    const degrees = randomProgressionDegrees(vibe);
+    state.song = applyChordsToPattern(state.song, state.selectedPattern, degrees);
+    swapAudio();
+  },
+
+  toggleSnap(): void {
+    state.snapToScale = !state.snapToScale;
+  },
+
+  /** Snap a note to the song's key/scale when snapping is on (melodic channels only). */
+  snapNote(ch: number, note: number): number {
+    if (!state.snapToScale || ch === 3 || note <= 0) return note;
+    return snapNoteToScale(note, state.song.config.key, state.song.config.scale);
   },
 
   setChannelVibe(ch: number, vibe: VibeName | null): void {
     state.song = applyChannelVibe(state.song, ch, vibe);
     swapAudio();
+  },
+
+  setChannelAlgo(ch: number, algo: string | null): void {
+    state.song = applyChannelAlgo(state.song, ch, algo as ChannelAlgos[number]);
+    swapAudio();
+  },
+
+  /** Write one note (0 = clear) into the selected pattern. */
+  setNote(ch: number, row: number, note: number): void {
+    const label = state.selectedPattern;
+    const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
+    pattern[ch][row + 2] = note;
+    state.song = {
+      ...state.song,
+      patterns: { ...state.song.patterns, [label]: pattern },
+    };
+    swapAudio();
+  },
+
+  /** Audition a note on a channel's instrument (used while editing). */
+  previewNote(ch: number, note: number): void {
+    if (note <= 0) return;
+    const params = [...state.song.instruments[ch]];
+    params[2] = (params[2] ?? 0) * 2 ** ((note - 12) / 12);
+    const samples = ZZFX.buildSamples(...params);
+    zzfxP([samples], 0.6);
   },
 
   regenChannel(ch: number): void {
@@ -263,6 +367,16 @@ export const store = {
     state.isExporting = true;
     try {
       await downloadPolyendProject(state.song, { trackCount: state.exportDevice });
+    } finally {
+      state.isExporting = false;
+    }
+  },
+
+  async exportPatterns(): Promise<void> {
+    if (state.isExporting) return;
+    state.isExporting = true;
+    try {
+      await downloadPolyendPatterns(state.song, { trackCount: state.exportDevice });
     } finally {
       state.isExporting = false;
     }

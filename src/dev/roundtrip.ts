@@ -5,7 +5,7 @@
 import JSZip from 'jszip';
 import { generateSong } from '../engine';
 import type { Song } from '../engine';
-import { buildPolyendProjectZip } from '../export/polyend';
+import { buildPatternsZip, buildPolyendProjectZip } from '../export/polyend';
 import { Tracker } from '../lib/polyend';
 
 async function asFile(zip: JSZip, path: string): Promise<File | null> {
@@ -121,6 +121,48 @@ export async function runRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 
     if (!parsed || parsed.sample.length <= 0) errors.push(`${path}: empty or unparseable sample`);
   }
   info.sampleLengths = sampleLengths;
+
+  return { ok: errors.length === 0, errors: errors.slice(0, 20), info };
+}
+
+/** Verify the patterns-only export: every .mtp parses and matches the song. */
+export async function runPatternsRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 = 12): Promise<Report> {
+  const errors: string[] = [];
+  const info: Record<string, unknown> = {};
+  const song = existingSong ?? generateSong();
+
+  const blob = await buildPatternsZip(song, { trackCount });
+  info.zipBytes = blob.size;
+  const zip = await new JSZip().loadAsync(await blob.arrayBuffer());
+  const paths = Object.keys(zip.files).filter((p) => !zip.files[p].dir).sort();
+  info.paths = paths;
+
+  if (paths.length !== song.patternOrder.length) {
+    errors.push(`expected ${song.patternOrder.length} .mtp files, got ${paths.length}`);
+  }
+  if (paths.some((p) => p.includes('/'))) {
+    errors.push('patterns zip should be flat (no folders)');
+  }
+
+  for (let p = 0; p < song.patternOrder.length; p++) {
+    const name = `pattern_${String(p + 1).padStart(2, '0')}.mtp`;
+    const file = await asFile(zip, name);
+    const parsed = file ? await Tracker.readPattern(file) : null;
+    if (!parsed) {
+      errors.push(`${name} missing or unparseable`);
+      continue;
+    }
+    if (parsed.trackCount !== trackCount) errors.push(`${name}: trackCount ${parsed.trackCount} != ${trackCount}`);
+    const source = song.patterns[song.patternOrder[p]];
+    for (let ch = 0; ch < 4; ch++) {
+      for (let row = 0; row < 32; row++) {
+        const srcNote = source[ch][row + 2];
+        const step = parsed.tracks[ch].steps[row];
+        if (srcNote <= 0 && step.note !== -1) errors.push(`${name} ch${ch} row${row}: expected empty`);
+        if (srcNote > 0 && step.note === -1) errors.push(`${name} ch${ch} row${row}: expected note`);
+      }
+    }
+  }
 
   return { ok: errors.length === 0, errors: errors.slice(0, 20), info };
 }

@@ -161,14 +161,43 @@ function buildChord(
   const thirdOctaveAdj = thirdChromatic < chordRootChromatic ? 1 : 0;
   const fifthOctaveAdj = fifthChromatic < chordRootChromatic ? 1 : 0;
 
+  // zzfxm note 0 means "rest", so C in the bass octave (C3) is unplayable.
+  // Shift the whole bass chord up an octave when that happens, otherwise
+  // C-rooted chords silently lose their bass notes.
+  const root = noteToZzfxm(chordRootChromatic, bassOctave);
+  const bassShift = root <= 0 ? 1 : 0;
+
   return {
-    root: noteToZzfxm(chordRootChromatic, bassOctave),
-    third: noteToZzfxm(thirdChromatic, bassOctave + thirdOctaveAdj),
-    fifth: noteToZzfxm(fifthChromatic, bassOctave + fifthOctaveAdj),
+    root: noteToZzfxm(chordRootChromatic, bassOctave + bassShift),
+    third: noteToZzfxm(thirdChromatic, bassOctave + bassShift + thirdOctaveAdj),
+    fifth: noteToZzfxm(fifthChromatic, bassOctave + bassShift + fifthOctaveAdj),
     rootMelody: noteToZzfxm(chordRootChromatic, melodyOctave),
     thirdMelody: noteToZzfxm(thirdChromatic, melodyOctave + thirdOctaveAdj),
     fifthMelody: noteToZzfxm(fifthChromatic, melodyOctave + fifthOctaveAdj),
   };
+}
+
+/** Pick a weighted random progression (as scale degrees) for a vibe. */
+export function randomProgressionDegrees(vibe: VibeName): number[] {
+  return [...pickWeighted(PROGRESSIONS[vibe]).degrees];
+}
+
+/** Build a playable progression from explicit scale degrees (user-editable). */
+export function progressionFromDegrees(
+  degrees: number[],
+  key: NoteName,
+  scale: ScaleName
+): ChordProgression {
+  const chords = degrees.map(degree => buildChord(degree, key, scale, 3, 4));
+
+  // Map each row to its chord (8 rows per chord)
+  const chordAtRow: ChordInfo[] = [];
+  for (let i = 0; i < ROWS; i++) {
+    const chordIdx = Math.min(Math.floor(i / ROWS_PER_CHORD), chords.length - 1);
+    chordAtRow.push(chords[chordIdx]);
+  }
+
+  return { chords, chordAtRow };
 }
 
 export function generateChordProgression(
@@ -176,18 +205,32 @@ export function generateChordProgression(
   key: NoteName,
   scale: ScaleName
 ): ChordProgression {
-  const progression = pickWeighted(PROGRESSIONS[vibe]);
-
-  const chords = progression.degrees.map(degree =>
-    buildChord(degree, key, scale, 3, 4)
-  );
-
-  // Map each row to its chord (8 rows per chord)
-  const chordAtRow: ChordInfo[] = [];
-  for (let i = 0; i < ROWS; i++) {
-    const chordIdx = Math.floor(i / ROWS_PER_CHORD);
-    chordAtRow.push(chords[chordIdx]);
-  }
-
-  return { chords, chordAtRow };
+  return progressionFromDegrees(randomProgressionDegrees(vibe), key, scale);
 }
+
+/**
+ * Human-readable chord name for a scale degree in a key/scale,
+ * e.g. degree 0 in C major -> "C", degree 1 -> "Dm", degree 6 -> "B°".
+ */
+export function chordDisplayName(degree: number, key: NoteName, scale: ScaleName): string {
+  const rootIdx = CHROMATIC.indexOf(key);
+  const intervals = SCALES[scale];
+  const len = intervals.length;
+
+  const rootInterval = intervals[degree % len];
+  const thirdInterval = intervals[(degree + 2) % len];
+  const fifthInterval = intervals[(degree + 4) % len];
+
+  const rootName = CHROMATIC[(rootIdx + rootInterval) % 12];
+  const thirdSemis = (thirdInterval - rootInterval + 12) % 12;
+  const fifthSemis = (fifthInterval - rootInterval + 12) % 12;
+
+  let quality = '';
+  if (thirdSemis === 3) quality = fifthSemis === 6 ? '°' : 'm';
+  else if (thirdSemis === 4 && fifthSemis === 8) quality = '+';
+
+  return `${rootName}${quality}`;
+}
+
+/** Number of chords a pattern progression holds (one per 8 rows). */
+export const CHORDS_PER_PATTERN = ROWS / ROWS_PER_CHORD;

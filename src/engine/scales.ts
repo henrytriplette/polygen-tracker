@@ -60,6 +60,24 @@ export function getScaleNotes(
   return notes;
 }
 
+/**
+ * Snap a zzfxm note to the nearest pitch in the key/scale.
+ * Ties resolve downward. Returns the note unchanged if already in scale.
+ */
+export function snapNoteToScale(note: number, root: NoteName, scale: ScaleName): number {
+  if (note <= 0) return note;
+  const rootIdx = CHROMATIC.indexOf(root);
+  const allowed = new Set(SCALES[scale].map((interval) => (rootIdx + interval) % 12));
+
+  for (let dist = 0; dist <= 6; dist++) {
+    const down = note - dist;
+    if (down >= 1 && allowed.has(((down % 12) + 12) % 12)) return down;
+    const up = note + dist;
+    if (up <= 48 && allowed.has(up % 12)) return up;
+  }
+  return note;
+}
+
 export function findScaleDegreeAbove(
   baseNote: number,
   degreesUp: number,

@@ -113,6 +113,55 @@ function setStep(step: StepData, note: number, instrument: number, effect: NoteE
   }
 }
 
+/**
+ * Convert one generated pattern into tracker-lib PatternData
+ * (see https://polyend.github.io/tracker-lib/#creating-and-writing-a-pattern).
+ */
+export function buildPatternData(
+  song: Song,
+  label: Song['patternOrder'][number],
+  trackCount: number,
+): ReturnType<typeof Tracker.createPattern> {
+  const source = song.patterns[label];
+  const effects = song.patternEffects?.[label];
+  const pattern = Tracker.createPattern(trackCount, ROWS);
+
+  for (let ch = 0; ch < 4; ch++) {
+    const channelData = source[ch];
+    const channelEffects = effects?.[ch];
+    const track = pattern.tracks[ch];
+
+    for (let row = 0; row < ROWS; row++) {
+      const note = channelData[row + 2];
+      if (note <= 0) continue;
+      const step = track.steps[row];
+      const effect = channelEffects?.[row] ?? null;
+
+      if (ch === 3) {
+        const split = drumSplitIndex(note);
+        setStep(step, POLYEND_C4, 3 + split, effect);
+      } else {
+        setStep(step, note + ZZFXM_TO_POLYEND, ch, effect);
+      }
+    }
+  }
+
+  return pattern;
+}
+
+/** Zip containing only the pattern files (pattern_01.mtp, ...), no project/instruments. */
+export async function buildPatternsZip(song: Song, options: PolyendExportOptions = {}): Promise<Blob> {
+  const trackCount = options.trackCount ?? 12;
+  const zip = new JSZip();
+
+  song.patternOrder.forEach((label, patternIdx) => {
+    const pattern = buildPatternData(song, label, trackCount);
+    zip.file(`pattern_${String(patternIdx + 1).padStart(2, '0')}.mtp`, Pattern.write(pattern));
+  });
+
+  return zip.generateAsync({ type: 'blob' });
+}
+
 export async function buildPolyendProjectZip(song: Song, options: PolyendExportOptions = {}): Promise<Blob> {
   const trackCount = options.trackCount ?? 12;
   const zip = new JSZip();
@@ -146,30 +195,7 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   const patternNames: string[] = [];
 
   song.patternOrder.forEach((label, patternIdx) => {
-    const source = song.patterns[label];
-    const effects = song.patternEffects?.[label];
-    const pattern = Tracker.createPattern(trackCount, ROWS);
-
-    for (let ch = 0; ch < 4; ch++) {
-      const channelData = source[ch];
-      const channelEffects = effects?.[ch];
-      const track = pattern.tracks[ch];
-
-      for (let row = 0; row < ROWS; row++) {
-        const note = channelData[row + 2];
-        if (note <= 0) continue;
-        const step = track.steps[row];
-        const effect = channelEffects?.[row] ?? null;
-
-        if (ch === 3) {
-          const split = drumSplitIndex(note);
-          setStep(step, POLYEND_C4, 3 + split, effect);
-        } else {
-          setStep(step, note + ZZFXM_TO_POLYEND, ch, effect);
-        }
-      }
-    }
-
+    const pattern = buildPatternData(song, label, trackCount);
     const role = song.patternRoles[label] ?? 'verse';
     patternNames.push(`${label} ${role}`.substring(0, 30));
     zip.file(`patterns/pattern_${String(patternIdx + 1).padStart(2, '0')}.mtp`, Pattern.write(pattern));
@@ -206,14 +232,22 @@ export function sanitizeProjectName(name: string): string {
   return (cleaned || 'polygen-song').substring(0, 32);
 }
 
-export async function downloadPolyendProject(song: Song, options: PolyendExportOptions = {}): Promise<void> {
-  const blob = await buildPolyendProjectZip(song, options);
-  const name = sanitizeProjectName(song.config.name);
+function downloadBlob(blob: Blob, filename: string): void {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `${name}.zip`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
+}
+
+export async function downloadPolyendProject(song: Song, options: PolyendExportOptions = {}): Promise<void> {
+  const blob = await buildPolyendProjectZip(song, options);
+  downloadBlob(blob, `${sanitizeProjectName(song.config.name)}.zip`);
+}
+
+export async function downloadPolyendPatterns(song: Song, options: PolyendExportOptions = {}): Promise<void> {
+  const blob = await buildPatternsZip(song, options);
+  downloadBlob(blob, `${sanitizeProjectName(song.config.name)}-patterns.zip`);
 }

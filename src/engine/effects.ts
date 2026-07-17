@@ -188,6 +188,8 @@ const ROLE_BUDGETS: Record<SectionRole, [number, number, number, number]> = {
   bridge:    [1, 0, 0, 1],  // very sparse, breathing room
   breakdown: [0, 0, 0, 2],  // drums only section — let kicks punch
   climax:    [4, 2, 2, 4],  // peak expression, secondary effect unlocked
+  chorus:    [3, 2, 2, 3],  // hook section — expressive but controlled
+  refrain:   [2, 1, 0, 2],  // lead hook gets color, backing stays plain
 };
 
 // --- STRUCTURAL POSITION FINDING ---

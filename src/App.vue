@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { store, VIBE_GROUPS } from './store';
-import { CHROMATIC } from './engine';
+import { CHROMATIC, STRUCTURE_OPTIONS } from './engine';
 import type { NoteName, ScaleName, SongLength, VibeName } from './engine';
+import ChordBar from './components/ChordBar.vue';
 import SequenceBar from './components/SequenceBar.vue';
 import TrackerGrid from './components/TrackerGrid.vue';
 
@@ -9,6 +10,10 @@ const state = store.state;
 
 function onVibe(e: Event) {
   store.setVibe((e.target as HTMLSelectElement).value as VibeName);
+}
+function onStructure(e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  store.setStructure(value === '' ? null : value);
 }
 
 const SCALES: ScaleName[] = ['major', 'minor', 'pentatonic', 'dorian', 'mixolydian', 'harmonicMinor'];
@@ -75,6 +80,16 @@ function onName(e: Event) {
       </label>
 
       <label class="ctl">
+        <span>STRUCT</span>
+        <select :value="state.song.structureId ?? ''" @change="onStructure">
+          <option value="">AUTO (vibe)</option>
+          <option v-for="s in STRUCTURE_OPTIONS" :key="s.id" :value="s.id" :title="s.description">
+            {{ s.label }}
+          </option>
+        </select>
+      </label>
+
+      <label class="ctl">
         <span>BPM</span>
         <input class="bpm" type="number" min="40" max="220" :value="state.song.config.bpm" @change="onBpm" />
         <button class="btn mini" title="Random BPM for this vibe" @click="store.rollBpm()">🎲</button>
@@ -82,6 +97,7 @@ function onName(e: Event) {
     </section>
 
     <SequenceBar />
+    <ChordBar />
 
     <main class="main">
       <TrackerGrid />
@@ -100,6 +116,7 @@ function onName(e: Event) {
       <button class="btn primary" :disabled="state.isExporting" @click="store.exportPolyend()">
         {{ state.isExporting ? 'PACKING…' : '⬇ POLYEND PROJECT (.zip)' }}
       </button>
+      <button class="btn" :disabled="state.isExporting" title="Only pattern_XX.mtp files — drop into an existing project's patterns folder" @click="store.exportPatterns()">⬇ PATTERNS (.mtp)</button>
       <button class="btn" @click="store.exportWav()">⬇ WAV</button>
       <div class="spacer" />
       <span class="hint">unzip into /Projects on the Tracker's SD card</span>

@@ -71,7 +71,14 @@ export function drumNoteToName(note: number): string {
 export type SongLength = 'short' | 'long' | 'epic';
 
 // Section roles define HOW a unique pattern is generated
-export type SectionRole = 'verse' | 'contrast' | 'bridge' | 'breakdown' | 'climax';
+export type SectionRole =
+  | 'verse'      // main theme, full arrangement
+  | 'contrast'   // different melody/chords, tension
+  | 'bridge'     // transitional, sparser, breathing room
+  | 'breakdown'  // drums+bass only
+  | 'climax'     // highest energy / drop
+  | 'chorus'     // the hook — bigger than a verse, catchier than a climax
+  | 'refrain';   // short recurring hook line over thinner backing
 
 // A structure template: roles for each unique pattern + the playback sequence
 export interface StructureTemplate {
@@ -101,6 +108,12 @@ export interface Song {
   sequence: number[];
   patternOrder: PatternLabel[];
   channelVibes?: ChannelVibes;
+  /** Chord progression per pattern as scale degrees (one chord per 8 rows). */
+  patternChords?: Record<PatternLabel, number[]>;
+  /** Per-channel pattern-generator override: null = vibe-driven default. */
+  channelAlgos?: import('./altPatterns').ChannelAlgos;
+  /** Selected song-structure option id: null = the vibe's own structures. */
+  structureId?: string | null;
 }
 
 export interface ScaleNote {
