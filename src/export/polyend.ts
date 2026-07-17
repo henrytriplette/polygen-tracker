@@ -126,6 +126,10 @@ export function buildPatternData(
   const effects = song.patternEffects?.[label];
   const pattern = Tracker.createPattern(trackCount, ROWS);
 
+  const swing = Math.max(0, Math.min(30, song.config.swing ?? 0));
+  const humanize = Math.max(0, Math.min(30, song.config.humanize ?? 0));
+  const noneFx = PatternFX[0]!;
+
   for (let ch = 0; ch < 4; ch++) {
     const channelData = source[ch];
     const channelEffects = effects?.[ch];
@@ -142,6 +146,21 @@ export function buildPatternData(
         setStep(step, POLYEND_C4, 3 + split, effect);
       } else {
         setStep(step, note + ZZFXM_TO_POLYEND, ch, effect);
+      }
+
+      // Groove FX in whichever step-FX slots remain free:
+      // swing = Micro-move on odd 16ths, humanize = randomized Volume.
+      const freeSlot = () => step.fx.findIndex((f) => f.type.index === noneFx.index);
+      if (swing > 0 && row % 2 === 1) {
+        const slot = freeSlot();
+        if (slot >= 0) step.fx[slot] = { type: fxByName('Micro-move'), value: Math.min(100, Math.round(swing)) };
+      }
+      if (humanize > 0) {
+        const slot = freeSlot();
+        if (slot >= 0) {
+          const vol = 100 - Math.round(Math.random() * humanize);
+          step.fx[slot] = { type: fxByName('Volume/Velocity'), value: Math.max(0, Math.min(100, vol)) };
+        }
       }
     }
   }

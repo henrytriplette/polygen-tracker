@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
 import { store, VIBE_GROUPS } from './store';
 import { CHROMATIC, STRUCTURE_OPTIONS } from './engine';
 import type { NoteName, ScaleName, SongLength, VibeName } from './engine';
 import ChordBar from './components/ChordBar.vue';
+import Oscilloscope from './components/Oscilloscope.vue';
 import SequenceBar from './components/SequenceBar.vue';
 import TrackerGrid from './components/TrackerGrid.vue';
 
@@ -34,6 +36,72 @@ function onBpm(e: Event) {
 function onName(e: Event) {
   store.setName((e.target as HTMLInputElement).value);
 }
+function onSeed(e: Event) {
+  state.seedInput = (e.target as HTMLInputElement).value;
+}
+function onLoadProject(e: Event) {
+  const select = e.target as HTMLSelectElement;
+  if (select.value) store.loadProject(select.value);
+  select.value = '';
+}
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) {
+    try {
+      await store.importSongJson(file);
+    } catch (err) {
+      console.error('Import failed:', err);
+    }
+  }
+  input.value = '';
+}
+
+// Global transport / history shortcuts. Typing fields keep their native keys.
+function onGlobalKey(e: KeyboardEvent) {
+  const target = e.target as HTMLElement;
+  const typing = target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA';
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    if (e.shiftKey) store.redo();
+    else store.undo();
+    e.preventDefault();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+    store.redo();
+    e.preventDefault();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+    store.newSong();
+    e.preventDefault();
+    return;
+  }
+  if (e.key === ' ' && !typing) {
+    store.togglePlay();
+    e.preventDefault();
+  }
+}
+
+async function onImportMtp(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) {
+    try {
+      await store.importMtp(file);
+    } catch (err) {
+      console.error('MTP import failed:', err);
+    }
+  }
+  input.value = '';
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKey);
+  store.loadFromHash();
+});
+onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 </script>
 
 <template>
@@ -41,7 +109,11 @@ function onName(e: Event) {
     <header class="bar">
       <h1 class="brand">POLYGEN<span>::TRACKER</span></h1>
       <input class="name-input" :value="state.song.config.name" spellcheck="false" @change="onName" />
+      <Oscilloscope />
       <div class="spacer" />
+      <button class="btn" :disabled="!state.undoCount" title="Undo (Ctrl+Z)" @click="store.undo()">↶</button>
+      <button class="btn" :disabled="!state.redoCount" title="Redo (Ctrl+Y)" @click="store.redo()">↷</button>
+      <button class="btn" title="Small variation of the selected pattern" @click="store.mutate()">🧬 MUTATE</button>
       <button class="btn primary" @click="store.newSong()">⟳ GENERATE</button>
       <button class="btn play" :class="{ active: state.isPlaying }" @click="store.togglePlay()">
         {{ state.isPlaying ? '■ STOP' : '▶ PLAY' }}
@@ -94,6 +166,44 @@ function onName(e: Event) {
         <input class="bpm" type="number" min="40" max="220" :value="state.song.config.bpm" @change="onBpm" />
         <button class="btn mini" title="Random BPM for this vibe" @click="store.rollBpm()">🎲</button>
       </label>
+
+      <label class="ctl">
+        <span>SWING</span>
+        <input
+          class="bpm"
+          type="number"
+          min="0"
+          max="30"
+          :value="state.song.config.swing ?? 0"
+          title="Swing % — odd 16ths play late (exports as Micro-move FX)"
+          @change="store.setSwing(Number(($event.target as HTMLInputElement).value))"
+        />
+      </label>
+
+      <label class="ctl">
+        <span>HUM</span>
+        <input
+          class="bpm"
+          type="number"
+          min="0"
+          max="30"
+          :value="state.song.config.humanize ?? 0"
+          title="Humanize % — random per-note velocity (exports as Volume FX)"
+          @change="store.setHumanize(Number(($event.target as HTMLInputElement).value))"
+        />
+      </label>
+
+      <label class="ctl">
+        <span>SEED</span>
+        <input
+          class="seed"
+          :value="state.seedInput"
+          :placeholder="state.lastSeed !== null ? String(state.lastSeed) : 'random'"
+          title="Enter a seed for reproducible generation; empty = random (last used shown)"
+          spellcheck="false"
+          @change="onSeed"
+        />
+      </label>
     </section>
 
     <SequenceBar />
@@ -118,7 +228,29 @@ function onName(e: Event) {
       </button>
       <button class="btn" :disabled="state.isExporting" title="Only pattern_XX.mtp files — drop into an existing project's patterns folder" @click="store.exportPatterns()">⬇ PATTERNS (.mtp)</button>
       <button class="btn" @click="store.exportWav()">⬇ WAV</button>
+      <button class="btn" :disabled="state.isExporting" title="Zip of 4 per-channel WAV stems" @click="store.exportStems()">⬇ STEMS</button>
+      <button class="btn" title="Standard MIDI file (4 tracks, GM drums)" @click="store.exportMidi()">⬇ MIDI</button>
+      <button class="btn" title="Song as JSON (.polygen.json)" @click="store.exportSongJson()">⬇ JSON</button>
+      <label class="btn file-btn" title="Load a .polygen.json song file">
+        ⬆ IMPORT<input type="file" accept=".json,application/json" @change="onImportFile" />
+      </label>
+      <label class="btn file-btn" title="Import a Polyend .mtp pattern into the selected pattern (best effort)">
+        ⬆ .MTP<input type="file" accept=".mtp" @change="onImportMtp" />
+      </label>
+      <button class="btn" title="Copy a shareable URL with the whole song in it" @click="store.shareUrl()">
+        {{ state.shareStatus === 'copied' ? '✓ COPIED' : state.shareStatus === 'failed' ? '✗ FAILED' : '🔗 SHARE' }}
+      </button>
       <div class="spacer" />
+      <span class="ctl">
+        <span>PROJECTS</span>
+        <button class="btn mini" title="Save current song to the browser" @click="store.saveProject()">💾 SAVE</button>
+        <select v-if="state.projects.length" title="Load a saved project" @change="onLoadProject">
+          <option value="">LOAD…</option>
+          <option v-for="p in state.projects" :key="p.id" :value="p.id">
+            {{ p.name }} ({{ new Date(p.savedAt).toLocaleDateString() }})
+          </option>
+        </select>
+      </span>
       <span class="hint">unzip into /Projects on the Tracker's SD card</span>
     </footer>
   </div>
@@ -193,6 +325,29 @@ select,
 }
 
 .bpm { width: 60px; }
+
+.seed {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  width: 105px;
+}
+
+.file-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 
 .btn {
   font-family: var(--mono);

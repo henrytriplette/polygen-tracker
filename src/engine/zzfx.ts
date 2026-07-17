@@ -101,14 +101,21 @@ export function zzfxP(
 
 // Per-channel renderer — returns array of [left, right] stereo pairs, one per channel.
 // Optional channelFilter renders only that channel (others get silent buffers).
+// swing (0-0.4): even rows lengthen, odd rows shorten by the same amount, so
+// pairs of rows keep their combined duration and channels stay in sync.
 export function zzfxMChannels(
   instruments: number[][],
   patterns: number[][][],
   sequence: number[],
   BPM = 125,
-  channelFilter?: number
+  channelFilter?: number,
+  swing = 0
 ): [number[], number[]][] {
   const beatLength = (ZZFX.sampleRate / BPM) * 60 >> 2;
+  const swingAmt = Math.max(0, Math.min(0.4, swing));
+  const evenLength = Math.round(beatLength * (1 + swingAmt));
+  const oddLength = 2 * beatLength - evenLength; // pairs sum exactly
+  const rowLength = (rowIdx: number) => (rowIdx % 2 === 0 ? evenLength : oddLength);
 
   // Determine channel count from patterns
   let channelCount = 0;
@@ -147,8 +154,6 @@ export function zzfxMChannels(
 
     sequence.forEach((patternIndex: number, sequenceIndex: number) => {
       const patternChannel = patterns[patternIndex][channelIndex] || [0, 0, 0];
-      const nextSampleOffset = outSampleOffset +
-        (patternChannel.length - 2 - (notFirstBeat ? 0 : 1)) * beatLength;
       const isSequenceEnd = sequenceIndex === sequence.length - 1;
 
       let k = outSampleOffset;
@@ -159,6 +164,7 @@ export function zzfxMChannels(
         notFirstBeat = ++i
       ) {
         const note = patternChannel[i];
+        const currentRowLength = rowLength(i - 2);
 
         const stop =
           (i === patternChannel.length + (isSequenceEnd ? 1 : 0) - 1 &&
@@ -169,8 +175,8 @@ export function zzfxMChannels(
 
         for (
           let j = 0;
-          j < beatLength && notFirstBeat;
-          j++ > beatLength - 99 && stop
+          j < currentRowLength && notFirstBeat;
+          j++ > currentRowLength - 99 && stop
             ? (attenuation += (attenuation < 1 ? 1 : 0) / 99)
             : 0
         ) {
@@ -197,7 +203,9 @@ export function zzfxMChannels(
         }
       }
 
-      outSampleOffset = nextSampleOffset;
+      // The write cursor is exact even with swing; the last pattern's tail row
+      // (isSequenceEnd) intentionally isn't carried forward.
+      outSampleOffset = isSequenceEnd ? outSampleOffset : k;
     });
   }
 

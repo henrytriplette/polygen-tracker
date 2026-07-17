@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, VIBE_GROUPS } from '../store';
-import { DRUM_NOTES, drumNoteToName, effectToDisplayString, noteToZzfxm, zzfxmToNoteName } from '../engine';
+import { DRUM_NOTES, FX_VALUES, drumNoteToName, effectToDisplayString, noteToZzfxm, zzfxmToNoteName } from '../engine';
 import type { VibeName } from '../engine';
 
 const state = store.state;
@@ -16,11 +16,14 @@ function onChannelAlgo(ch: number, e: Event) {
   store.setChannelAlgo(ch, value === '' ? null : value);
 }
 
-// --- Note editing ---------------------------------------------------------
-// Click a note cell to place the cursor, then type notes tracker-style.
-const cursor = ref<{ ch: number; row: number } | null>(null);
+// --- Note + FX editing ------------------------------------------------------
+// Click a note or fx cell to place the cursor, then type tracker-style.
+const cursor = ref<{ ch: number; row: number; lane: 'note' | 'fx' } | null>(null);
 const octave = ref(4);
 const gridEl = ref<HTMLElement | null>(null);
+
+// FX lane: number keys place effects with their default values
+const FX_KEY_CODES = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR'] as const;
 
 // FastTracker-style piano layout: bottom row = current octave, top row = +1.
 const PIANO_KEYS: Record<string, number> = {
@@ -34,16 +37,21 @@ const DRUM_KEYS: Record<string, number> = {
   '3': DRUM_NOTES.HAT,
 };
 
-function selectCell(ch: number, row: number) {
-  cursor.value = { ch, row };
+function selectCell(ch: number, row: number, lane: 'note' | 'fx' = 'note') {
+  cursor.value = { ch, row, lane };
   gridEl.value?.focus();
 }
 
-function moveCursor(dCh: number, dRow: number) {
+function moveCursor(dCol: number, dRow: number) {
   if (!cursor.value) return;
+  const { ch, row, lane } = cursor.value;
+  // Horizontal movement walks columns: note, fx, note, fx, ... across channels
+  let col = ch * 2 + (lane === 'fx' ? 1 : 0) + dCol;
+  col = ((col % 8) + 8) % 8;
   cursor.value = {
-    ch: (cursor.value.ch + dCh + 4) % 4,
-    row: (cursor.value.row + dRow + 32) % 32,
+    ch: Math.floor(col / 2),
+    lane: col % 2 === 0 ? 'note' : 'fx',
+    row: (row + dRow + 32) % 32,
   };
 }
 
@@ -54,6 +62,11 @@ function enterNote(note: number) {
   store.setNote(cursor.value.ch, cursor.value.row, snapped);
   store.previewNote(cursor.value.ch, snapped);
   moveCursor(0, 1); // tracker convention: advance to the next row
+}
+
+function currentEffect() {
+  if (!cursor.value) return null;
+  return state.song.patternEffects?.[state.selectedPattern]?.[cursor.value.ch]?.[cursor.value.row] ?? null;
 }
 
 function onKey(e: KeyboardEvent) {
@@ -68,12 +81,44 @@ function onKey(e: KeyboardEvent) {
     case 'Escape': cursor.value = null; return;
     case 'Delete':
     case 'Backspace':
-      store.setNote(cursor.value.ch, cursor.value.row, 0);
+      if (cursor.value.lane === 'fx') store.setEffect(cursor.value.ch, cursor.value.row, null);
+      else store.setNote(cursor.value.ch, cursor.value.row, 0);
       moveCursor(0, 1);
       e.preventDefault();
       return;
   }
 
+  // --- FX lane -------------------------------------------------------------
+  if (cursor.value.lane === 'fx') {
+    const idx = Number.parseInt(key, 10) - 1;
+    if (idx >= 0 && idx < FX_KEY_CODES.length) {
+      const code = FX_KEY_CODES[idx];
+      store.setEffect(cursor.value.ch, cursor.value.row, { code, value: FX_VALUES[code] });
+      moveCursor(0, 1);
+      e.preventDefault();
+      return;
+    }
+    if (key === '+' || key === '=' || key === '-') {
+      const fx = currentEffect();
+      if (fx) {
+        const delta = key === '-' ? -0x10 : 0x10;
+        store.setEffect(cursor.value.ch, cursor.value.row, {
+          code: fx.code,
+          value: Math.max(0, Math.min(255, fx.value + delta)),
+        });
+      }
+      e.preventDefault();
+      return;
+    }
+    if (key === '.') {
+      store.setEffect(cursor.value.ch, cursor.value.row, null);
+      moveCursor(0, 1);
+      e.preventDefault();
+    }
+    return;
+  }
+
+  // --- Note lane -----------------------------------------------------------
   if (key === '+' || key === '=') { octave.value = Math.min(6, octave.value + 1); e.preventDefault(); return; }
   if (key === '-') { octave.value = Math.max(3, octave.value - 1); e.preventDefault(); return; }
   if (key === '.') { store.setNote(cursor.value.ch, cursor.value.row, 0); moveCursor(0, 1); e.preventDefault(); return; }
@@ -145,7 +190,8 @@ function hasNote(ch: number, row: number): boolean {
                 title="Solo"
                 @click="store.toggleSolo(ch)"
               >S</button>
-              <button class="mini" title="Regenerate channel" @click="store.regenChannel(ch)">↻</button>
+              <button class="mini" title="Regenerate/populate this channel in the selected pattern" @click="store.regenChannel(ch)">↻</button>
+              <button class="mini" title="Regenerate this channel in ALL patterns" @click="store.regenChannelAll(ch)">↻*</button>
             </span>
             <select
               class="ch-vibe"
@@ -185,11 +231,18 @@ function hasNote(ch: number, row: number): boolean {
               :style="hasNote(ch - 1, row - 1) ? { color: store.channelColor(ch - 1) } : undefined"
               :class="{
                 empty: !hasNote(ch - 1, row - 1),
-                cursor: cursor?.ch === ch - 1 && cursor?.row === row - 1,
+                cursor: cursor?.ch === ch - 1 && cursor?.row === row - 1 && cursor?.lane === 'note',
               }"
-              @click="selectCell(ch - 1, row - 1)"
+              @click="selectCell(ch - 1, row - 1, 'note')"
             >{{ noteAt(ch - 1, row - 1) }}</td>
-            <td class="fx" :class="{ empty: fxAt(ch - 1, row - 1) === '----' }">{{ fxAt(ch - 1, row - 1) }}</td>
+            <td
+              class="fx"
+              :class="{
+                empty: fxAt(ch - 1, row - 1) === '----',
+                cursor: cursor?.ch === ch - 1 && cursor?.row === row - 1 && cursor?.lane === 'fx',
+              }"
+              @click="selectCell(ch - 1, row - 1, 'fx')"
+            >{{ fxAt(ch - 1, row - 1) }}</td>
           </template>
         </tr>
       </tbody>
@@ -207,7 +260,9 @@ function hasNote(ch: number, row: number): boolean {
         @click="store.toggleSnap()"
       >SNAP:{{ state.snapToScale ? 'ON' : 'OFF' }}</button>
       <span class="edit-help">
-        Z-M / Q-U notes · 1/2/3 drums · DEL clear · +/- octave · arrows move · ESC done
+        {{ cursor?.lane === 'fx'
+          ? '1-8 = SU SD VB DT ST PD BC TR · +/- value · DEL clear · arrows move · ESC done'
+          : 'Z-M / Q-U notes · 1/2/3 drums · DEL clear · +/- octave · arrows move · ESC done' }}
       </span>
     </div>
   </div>
@@ -322,7 +377,18 @@ td {
   background: rgba(255, 138, 42, 0.18);
 }
 
-.fx { color: var(--fx); }
+.fx {
+  color: var(--fx);
+  cursor: pointer;
+}
+
+.fx:hover { background: rgba(143, 123, 216, 0.12); }
+
+.fx.cursor {
+  outline: 1px solid var(--fx);
+  outline-offset: -1px;
+  background: rgba(143, 123, 216, 0.18);
+}
 
 .empty { color: var(--text-faint); }
 

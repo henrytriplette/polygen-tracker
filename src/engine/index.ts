@@ -1,5 +1,7 @@
-export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, applyChannelVibe, applyChannelAlgo, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
+export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, applyChannelVibe, applyChannelAlgo, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
 export { STRUCTURE_OPTIONS, findStructure } from './structures';
+export { mutatePattern } from './mutate';
+export { withSeed, randomSeed } from './random';
 export type { StructureOption } from './structures';
 export type { ChannelAlgos, LeadAlgo, HarmonyAlgo, BassAlgo, DrumAlgo } from './altPatterns';
 export { generateInstruments, generateInstrumentForChannel } from './instruments';
@@ -10,7 +12,8 @@ export { drumNoteToName, DRUM_NOTES, effectToDisplayString } from './types';
 export { euclidean } from './euclidean';
 export { VIBE_CONFIG, getRandomBpm } from './vibes';
 export { generateChordProgression, progressionFromDegrees, randomProgressionDegrees, chordDisplayName, CHORDS_PER_PATTERN } from './chords';
-export { applyEffect, generatePatternEffects, generateChannelEffects } from './effects';
+export { applyEffect, generatePatternEffects, generateChannelEffects, FX_VALUES } from './effects';
+export { EFFECT_CODES } from './types';
 export { generateSongName } from './songNames';
 export type {
   Song,

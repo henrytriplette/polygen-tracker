@@ -17,7 +17,17 @@ Click GENERATE and get a complete 4-channel retro song — lead, harmony, bass, 
 - **Per-channel pattern algorithms** — besides the vibe default (AUTO), each channel has selectable generators: lead WALK / ARP (chord arpeggios) / RIFF (transposed ostinato); harmony GAPFILL / STABS (offbeat skanks) / ARP (C64-style) / PEDAL; bass GROOVE / ACID (16th lines with octave jumps) / ARP (root-fifth-octave) / OFFBEAT (house pump); drums TEMPLATE / EUCLID (euclidean kit) / BREAK (breakbeat skeletons) / 4-FLOOR
 - **Polyend Tracker export** — a zip containing `project.mt`, `patterns/*.mtp` + `patternsMetadata`, and `instruments/*.pti` with the ZzFX instruments rendered to samples (lead/harmony/bass at C4, drums split into kick/snare/hat). Unzip into `/Projects` on the SD card.
 - **Patterns-only export** — a flat zip of `pattern_XX.mtp` files (via tracker-lib's pattern writer) to drop into an existing project's `patterns` folder
-- **WAV export** of the full mix
+- **WAV export** of the full mix, **per-channel stems** (zip of 4 WAVs), and **MIDI export** (format-1, 4 named tracks, GM drums on channel 10)
+- **Persistence** — the working song auto-saves to localStorage; named projects can be saved/loaded/deleted in the browser; songs export/import as `.polygen.json` files; **shareable URLs** pack the whole song deflate-compressed into the location hash
+- **Undo/redo** (Ctrl+Z / Ctrl+Y, 64 steps) over every song change
+- **Mutate** — small skeleton-preserving variation of the selected pattern (scale-neighbor nudges, chord-tone swaps, drum ghosts) instead of a full reroll
+- **Seeded generation** — type a seed for reproducible songs; the last random seed is shown
+- **Swing & humanize** — swing shifts odd 16ths in playback (pair-balanced renderer timing) and exports as Micro-move step FX; humanize adds random per-note velocity via zzfxm fractional-note attenuation and exports as Volume step FX
+- **FX lane editing** — cursor moves into effect columns; keys 1-8 place SU/SD/VB/DT/ST/PD/BC/TR, +/- adjusts the value
+- **Arrangement editing** — right-click a song slot to cycle its pattern, shift+click removes it, + appends, +PAT adds a new generated pattern (up to 8)
+- **Per-channel regenerate** — ↻ regenerates (or populates, even in breakdowns) the channel in the selected pattern, ↻* across all patterns
+- **Transport & workflow** — Space play/stop, Ctrl+G generate, follow mode (👁) tracks the playing pattern, oscilloscope in the header
+- **`.mtp` import** — load a Polyend pattern file into the selected pattern (best effort mapping)
 - **PWA** — installable, works offline
 
 ## Polyend export details

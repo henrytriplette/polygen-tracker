@@ -12,6 +12,12 @@ function labelAt(seqIdx: number): PatternLabel {
 <template>
   <div class="seq">
     <span class="seq-title">SONG</span>
+    <button
+      class="seq-slot follow"
+      :class="{ selected: state.follow }"
+      title="Follow the playing pattern in the grid"
+      @click="store.toggleFollow()"
+    >👁</button>
     <div class="seq-chain">
       <button
         v-for="(_, i) in state.song.sequence"
@@ -21,8 +27,15 @@ function labelAt(seqIdx: number): PatternLabel {
           selected: labelAt(i) === state.selectedPattern,
           playing: state.isPlaying && state.playSeqIdx === i,
         }"
-        @click="store.selectPattern(labelAt(i))"
+        title="Click: view · Right-click: cycle pattern · Shift+click: remove slot"
+        @click="$event.shiftKey ? store.removeSequenceSlot(i) : store.selectPattern(labelAt(i))"
+        @contextmenu.prevent="store.cycleSequenceSlot(i)"
       >{{ labelAt(i) }}</button>
+      <button
+        class="seq-slot add"
+        title="Append the selected pattern to the song chain"
+        @click="store.appendSequenceSlot()"
+      >+</button>
     </div>
     <span class="seq-title">PATTERNS</span>
     <div class="seq-chain">
@@ -38,6 +51,12 @@ function labelAt(seqIdx: number): PatternLabel {
         {{ label }}<span class="role">{{ state.song.patternRoles[label].slice(0, 4) }}</span>
       </button>
       <button class="seq-slot regen" title="Regenerate selected pattern" @click="store.regenPattern(state.selectedPattern)">↻ {{ state.selectedPattern }}</button>
+      <button
+        v-if="state.song.patternOrder.length < 8"
+        class="seq-slot add"
+        title="Add a new generated pattern (also appended to the song chain)"
+        @click="store.addPattern()"
+      >+PAT</button>
     </div>
   </div>
 </template>
@@ -93,4 +112,7 @@ function labelAt(seqIdx: number): PatternLabel {
 }
 
 .seq-slot.regen { color: var(--fx); }
+
+.seq-slot.add { color: var(--text-dim); }
+.seq-slot.add:hover { color: var(--accent); border-color: var(--accent); }
 </style>

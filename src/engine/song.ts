@@ -407,6 +407,41 @@ export function applySongStructure(song: Song, structureId: string | null): Song
   };
 }
 
+/** Regenerate one channel in every pattern (keeps everything else). */
+export function regenerateChannelInAllPatterns(
+  song: Song,
+  channelIndex: number,
+  options: { forceAudible?: boolean } = {}
+): Song {
+  let next: Song = song;
+  for (const label of song.patternOrder) {
+    const { pattern, effects } = regenerateChannel(next, label, channelIndex, options);
+    next = {
+      ...next,
+      patterns: { ...next.patterns, [label]: pattern },
+      patternEffects: { ...next.patternEffects, [label]: effects },
+    };
+  }
+  return next;
+}
+
+/** Append a freshly generated pattern (next free label, up to 8). */
+export function addPatternToSong(song: Song, role: SectionRole = 'verse'): Song {
+  if (song.patternOrder.length >= PATTERN_LABELS.length) return song;
+  const label = PATTERN_LABELS[song.patternOrder.length];
+  const { pattern, effects, degrees } = generatePatternForRole(
+    song.config, role, song.channelVibes, undefined, song.channelAlgos
+  );
+  return {
+    ...song,
+    patterns: { ...song.patterns, [label]: pattern },
+    patternRoles: { ...song.patternRoles, [label]: role },
+    patternEffects: { ...song.patternEffects, [label]: effects },
+    patternChords: { ...song.patternChords, [label]: degrees } as Song['patternChords'],
+    patternOrder: [...song.patternOrder, label],
+  };
+}
+
 export function regeneratePattern(
   song: Song,
   patternLabel: PatternLabel
@@ -418,10 +453,16 @@ export function regeneratePattern(
 export function regenerateChannel(
   song: Song,
   patternLabel: PatternLabel,
-  channelIndex: number
+  channelIndex: number,
+  options: { forceAudible?: boolean } = {}
 ): { pattern: Pattern; effects: PatternEffects } {
   const pattern = [...song.patterns[patternLabel]] as Pattern;
-  const role = song.patternRoles[patternLabel] ?? 'verse';
+  let role = song.patternRoles[patternLabel] ?? 'verse';
+  // "Populate" mode: an explicit request for lead/harmony in a breakdown
+  // pattern should produce notes, not respect the role's silence.
+  if (options.forceAudible && role === 'breakdown' && channelIndex < 2) {
+    role = 'verse';
+  }
   const channelVibe = vibeAt(song.config, song.channelVibes, channelIndex);
   const channelVibeConfig = VIBE_CONFIG[channelVibe];
 
@@ -774,8 +815,23 @@ export function songToZzfxm(song: Song): {
 // Render song to 4 logical stereo channel buffers (for AudioGraph playback)
 export function renderSongBuffers(song: Song): [number[], number[]][] {
   const expanded = expandSong(song);
+
+  // Humanize: zzfxm reads a note's fractional part as attenuation, so random
+  // per-note velocity costs nothing — add a fraction to each integer note.
+  const humanize = Math.max(0, Math.min(30, song.config.humanize ?? 0)) / 100;
+  const patterns = humanize > 0
+    ? expanded.patterns.map((pattern) =>
+        pattern.map((channel) =>
+          channel.map((value, idx) =>
+            idx >= 2 && value > 0 ? Math.floor(value) + Math.min(0.95, Math.random() * humanize) : value
+          )
+        )
+      )
+    : expanded.patterns;
+
+  const swing = Math.max(0, Math.min(30, song.config.swing ?? 0)) / 100;
   const physicalBuffers = zzfxMChannels(
-    expanded.instruments, expanded.patterns, expanded.sequence, expanded.bpm
+    expanded.instruments, patterns, expanded.sequence, expanded.bpm, undefined, swing
   );
   if (physicalBuffers.length === 0) return [];
   return mixToLogical(physicalBuffers, expanded.channelMap);

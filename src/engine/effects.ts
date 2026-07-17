@@ -61,7 +61,8 @@ export function applyEffect(baseParams: ZzFXSound, effect: NoteEffect): ZzFXSoun
 
 // Single fixed value per effect — consistency over variety.
 // Using the middle palette value keeps things musical without being extreme.
-const FX_VALUES: Record<EffectCode, number> = {
+// Exported as the default value when the user places an effect by hand.
+export const FX_VALUES: Record<EffectCode, number> = {
   SU: 0x60,  // ~1.5 semitone slide up
   SD: 0x60,  // ~1.5 semitone slide down
   VB: 0x36,  // ~4 Hz vibrato, moderate depth

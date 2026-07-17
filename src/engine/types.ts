@@ -93,6 +93,10 @@ export interface SongConfig {
   scale: ScaleName;
   bpm: number;
   length: SongLength;
+  /** Swing amount in percent (0-30): odd 16th rows play late. */
+  swing?: number;
+  /** Velocity humanization in percent (0-30): random per-note attenuation. */
+  humanize?: number;
 }
 
 // Per-channel vibe override: null = follow the song's vibe.
