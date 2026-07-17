@@ -15,11 +15,12 @@ function draw() {
 
   const w = el.width;
   const h = el.height;
-  ctx.fillStyle = '#131419';
+  ctx.fillStyle = '#14161c';
   ctx.fillRect(0, 0, w, h);
 
   const analyser = store.state.isPlaying ? store.getAnalyser() : null;
-  ctx.strokeStyle = '#ff8a2a';
+  // Orange only while playing (play state); flat idle trace stays neutral.
+  ctx.strokeStyle = analyser ? '#ff8a2a' : '#464a54';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
 
@@ -51,7 +52,9 @@ onUnmounted(() => cancelAnimationFrame(raf));
 
 <style scoped>
 .scope {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  background: var(--panel);
   display: block;
 }
 </style>

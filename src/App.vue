@@ -121,89 +121,104 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
     </header>
 
     <section class="bar controls">
-      <label class="ctl">
-        <span>VIBE</span>
-        <select class="vibe-select" :value="state.song.config.vibe" @change="onVibe">
-          <optgroup v-for="g in VIBE_GROUPS" :key="g.label" :label="g.label">
-            <option v-for="v in g.vibes" :key="v.value" :value="v.value">{{ v.label }}</option>
-          </optgroup>
-        </select>
-      </label>
+      <div class="ctl-group">
+        <span class="group-label">COMPOSITION</span>
+        <div class="group-fields">
+          <label class="ctl">
+            <span>VIBE</span>
+            <select class="vibe-select" :value="state.song.config.vibe" @change="onVibe">
+              <optgroup v-for="g in VIBE_GROUPS" :key="g.label" :label="g.label">
+                <option v-for="v in g.vibes" :key="v.value" :value="v.value">{{ v.label }}</option>
+              </optgroup>
+            </select>
+          </label>
 
-      <label class="ctl">
-        <span>KEY</span>
-        <select :value="state.song.config.key" @change="onKey">
-          <option v-for="n in CHROMATIC" :key="n" :value="n">{{ n }}</option>
-        </select>
-      </label>
+          <label class="ctl">
+            <span>KEY</span>
+            <select :value="state.song.config.key" @change="onKey">
+              <option v-for="n in CHROMATIC" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </label>
 
-      <label class="ctl">
-        <span>SCALE</span>
-        <select :value="state.song.config.scale" @change="onScale">
-          <option v-for="s in SCALES" :key="s" :value="s">{{ s }}</option>
-        </select>
-      </label>
+          <label class="ctl">
+            <span>SCALE</span>
+            <select :value="state.song.config.scale" @change="onScale">
+              <option v-for="s in SCALES" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </label>
+        </div>
+      </div>
 
-      <label class="ctl">
-        <span>LEN</span>
-        <select :value="state.song.config.length" @change="onLength">
-          <option v-for="l in LENGTHS" :key="l" :value="l">{{ l }}</option>
-        </select>
-      </label>
+      <div class="ctl-group">
+        <span class="group-label">GENERATION</span>
+        <div class="group-fields">
+          <label class="ctl">
+            <span>LENGTH</span>
+            <select :value="state.song.config.length" @change="onLength">
+              <option v-for="l in LENGTHS" :key="l" :value="l">{{ l }}</option>
+            </select>
+          </label>
 
-      <label class="ctl">
-        <span>STRUCT</span>
-        <select :value="state.song.structureId ?? ''" @change="onStructure">
-          <option value="">AUTO (vibe)</option>
-          <option v-for="s in STRUCTURE_OPTIONS" :key="s.id" :value="s.id" :title="s.description">
-            {{ s.label }}
-          </option>
-        </select>
-      </label>
+          <label class="ctl">
+            <span>STRUCT</span>
+            <select :value="state.song.structureId ?? ''" @change="onStructure">
+              <option value="">AUTO (vibe)</option>
+              <option v-for="s in STRUCTURE_OPTIONS" :key="s.id" :value="s.id" :title="s.description">
+                {{ s.label }}
+              </option>
+            </select>
+          </label>
 
-      <label class="ctl">
-        <span>BPM</span>
-        <input class="bpm" type="number" min="40" max="220" :value="state.song.config.bpm" @change="onBpm" />
-        <button class="btn mini" title="Random BPM for this vibe" @click="store.rollBpm()">🎲</button>
-      </label>
+          <label class="ctl">
+            <span>SEED</span>
+            <input
+              class="seed"
+              :value="state.seedInput"
+              :placeholder="state.lastSeed !== null ? String(state.lastSeed) : 'random'"
+              title="Enter a seed for reproducible generation; empty = random (last used shown)"
+              spellcheck="false"
+              @change="onSeed"
+            />
+          </label>
+        </div>
+      </div>
 
-      <label class="ctl">
-        <span>SWING</span>
-        <input
-          class="bpm"
-          type="number"
-          min="0"
-          max="30"
-          :value="state.song.config.swing ?? 0"
-          title="Swing % — odd 16ths play late (exports as Micro-move FX)"
-          @change="store.setSwing(Number(($event.target as HTMLInputElement).value))"
-        />
-      </label>
+      <div class="ctl-group">
+        <span class="group-label">TIMING</span>
+        <div class="group-fields">
+          <label class="ctl">
+            <span>BPM</span>
+            <input class="bpm" type="number" min="40" max="220" :value="state.song.config.bpm" @change="onBpm" />
+            <button class="btn mini" title="Random BPM for this vibe" @click="store.rollBpm()">🎲</button>
+          </label>
 
-      <label class="ctl">
-        <span>HUM</span>
-        <input
-          class="bpm"
-          type="number"
-          min="0"
-          max="30"
-          :value="state.song.config.humanize ?? 0"
-          title="Humanize % — random per-note velocity (exports as Volume FX)"
-          @change="store.setHumanize(Number(($event.target as HTMLInputElement).value))"
-        />
-      </label>
+          <label class="ctl">
+            <span>SWING</span>
+            <input
+              class="bpm"
+              type="number"
+              min="0"
+              max="30"
+              :value="state.song.config.swing ?? 0"
+              title="Swing % — odd 16ths play late (exports as Micro-move FX)"
+              @change="store.setSwing(Number(($event.target as HTMLInputElement).value))"
+            />
+          </label>
 
-      <label class="ctl">
-        <span>SEED</span>
-        <input
-          class="seed"
-          :value="state.seedInput"
-          :placeholder="state.lastSeed !== null ? String(state.lastSeed) : 'random'"
-          title="Enter a seed for reproducible generation; empty = random (last used shown)"
-          spellcheck="false"
-          @change="onSeed"
-        />
-      </label>
+          <label class="ctl">
+            <span>HUMANIZE</span>
+            <input
+              class="bpm"
+              type="number"
+              min="0"
+              max="30"
+              :value="state.song.config.humanize ?? 0"
+              title="Humanize % — random per-note velocity (exports as Volume FX)"
+              @change="store.setHumanize(Number(($event.target as HTMLInputElement).value))"
+            />
+          </label>
+        </div>
+      </div>
     </section>
 
     <SequenceBar />
@@ -261,8 +276,8 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 8px 12px;
-  gap: 4px;
+  padding: 10px 14px 8px;
+  gap: 8px;
 }
 
 .bar {
@@ -270,6 +285,14 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* --- Header: highest emphasis layer -------------------------------------- */
+header.bar {
+  background: var(--panel-raised);
+  border-radius: 4px;
+  padding: 7px 10px;
+  box-shadow: var(--shadow-raise);
 }
 
 .brand {
@@ -286,55 +309,108 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 .name-input {
   font-family: var(--mono);
   font-size: 13px;
-  background: var(--panel);
-  color: var(--text);
+  font-weight: 600;
+  background: var(--field);
+  color: var(--text-bright);
   border: 1px solid var(--border);
-  padding: 5px 8px;
+  padding: 5px 9px;
   min-width: 220px;
+  box-shadow: var(--shadow-inset);
 }
 
+.name-input:hover { background: var(--field-hover); }
 .name-input:focus { border-color: var(--accent); outline: none; }
 
 .spacer { flex: 1; }
 
-.controls { padding: 2px 0; }
+/* --- Control groups: composition / generation / timing ------------------- */
+.controls {
+  padding: 2px 0;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.ctl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+}
+
+.ctl-group + .ctl-group::before {
+  content: '';
+  position: absolute;
+  left: -11px;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.group-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-faint);
+  font-weight: 700;
+  padding-left: 1px;
+}
+
+.group-fields {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
 .ctl {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 10px;
   letter-spacing: 1px;
   color: var(--text-dim);
 }
 
+/* --- Interactive fields read as clickable, not as labels ----------------- */
 .vibe-select {
   min-width: 130px;
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--border-strong);
+  color: var(--text-bright);
+  font-weight: 600;
 }
 
 select,
 .bpm {
   font-family: var(--mono);
   font-size: 12px;
-  background: var(--panel);
+  background: var(--field);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 4px 6px;
+  padding: 5px 7px;
+  box-shadow: var(--shadow-inset);
+  cursor: pointer;
 }
 
-.bpm { width: 60px; }
+select:hover,
+.bpm:hover { background: var(--field-hover); border-color: var(--border-strong); }
+select:focus,
+.bpm:focus { border-color: var(--accent); outline: none; }
+
+.bpm { width: 58px; cursor: text; }
 
 .seed {
   font-family: var(--mono);
   font-size: 12px;
-  background: var(--panel);
+  background: var(--field);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 4px 6px;
+  padding: 5px 7px;
   width: 105px;
+  box-shadow: var(--shadow-inset);
 }
+
+.seed:hover { background: var(--field-hover); }
+.seed:focus { border-color: var(--accent); outline: none; }
 
 .file-btn {
   position: relative;
@@ -349,37 +425,59 @@ select,
   cursor: pointer;
 }
 
+/* --- Buttons: layered affordances ---------------------------------------- */
 .btn {
   font-family: var(--mono);
   font-size: 12px;
-  padding: 5px 10px;
-  background: var(--panel);
+  padding: 6px 11px;
+  background: var(--field);
   color: var(--text);
   border: 1px solid var(--border);
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--shadow-raise);
 }
 
-.btn:hover { border-color: var(--text-dim); }
-.btn:disabled { opacity: 0.5; cursor: default; }
+.btn:hover { background: var(--field-hover); border-color: var(--border-strong); }
+.btn:active { box-shadow: var(--shadow-inset); }
+.btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
+/* GENERATE — a primary action, gets the orange */
 .btn.primary {
   border-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
 }
 
 .btn.primary:hover { background: var(--accent); color: #000; }
 
+/* PLAY — the most alive control on screen */
 .btn.play {
   border-color: var(--ch-lead);
   color: var(--ch-lead);
-  min-width: 80px;
+  font-weight: 700;
+  min-width: 92px;
+  padding: 6px 14px;
+  letter-spacing: 1px;
+  background: linear-gradient(180deg, rgba(93, 217, 124, 0.12), rgba(93, 217, 124, 0.04));
 }
 
-.btn.play.active,
 .btn.play:hover { background: var(--ch-lead); color: #000; }
 
-.btn.mini { padding: 3px 6px; font-size: 11px; }
+.btn.play.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(255, 138, 42, 0.5);
+  animation: play-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes play-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 10px rgba(255, 138, 42, 0.35); }
+  50% { box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(255, 138, 42, 0.6); }
+}
+
+.btn.mini { padding: 4px 7px; font-size: 11px; box-shadow: none; }
 
 .main {
   flex: 1;
@@ -390,16 +488,45 @@ select,
 
 .main > * { flex: 1; min-height: 0; }
 
-.export { padding-top: 6px; border-top: 1px solid var(--border); }
+/* --- Export: lowest emphasis — recedes behind the tracker ---------------- */
+.export {
+  padding: 6px 2px 0;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-subtle);
+  gap: 5px;
+  font-size: 11px;
+}
+
+.export .btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: transparent;
+  border-color: var(--border-subtle);
+  color: var(--text-dim);
+  box-shadow: none;
+}
+
+.export .btn:hover { background: var(--field); color: var(--text); border-color: var(--border); }
+
+.export .btn.primary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.export .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+
+.export select { font-size: 11px; padding: 4px 6px; }
 
 .export-title {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-faint);
+  font-weight: 700;
 }
 
 .hint {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-faint);
   font-family: var(--mono);
 }

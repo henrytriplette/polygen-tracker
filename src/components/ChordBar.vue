@@ -44,26 +44,30 @@ function onChord(slot: number, e: Event) {
 .chords {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 2px 0 6px;
+  padding: 7px 10px;
+  background: var(--panel);
+  border-radius: 4px;
+  box-shadow: var(--shadow-raise);
 }
 
 .chords-title {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-faint);
+  font-weight: 700;
 }
 
 .chord-slots {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .chord-slot {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 .bars {
@@ -75,26 +79,29 @@ function onChord(slot: number, e: Event) {
 .chord-slot select {
   font-family: var(--mono);
   font-size: 12px;
-  background: var(--panel);
+  background: var(--field);
   color: var(--fx);
   border: 1px solid var(--border);
-  padding: 3px 5px;
+  padding: 4px 6px;
+  box-shadow: var(--shadow-inset);
+  cursor: pointer;
 }
 
-.chord-slot select:hover { border-color: var(--text-dim); }
+.chord-slot select:hover { background: var(--field-hover); border-color: var(--fx); }
 
 .dice {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 4px 8px;
-  background: var(--panel);
+  padding: 5px 9px;
+  background: var(--field);
   color: var(--fx);
   border: 1px solid var(--border);
   cursor: pointer;
   align-self: flex-end;
+  box-shadow: var(--shadow-raise);
 }
 
-.dice:hover { border-color: var(--fx); }
+.dice:hover { background: var(--field-hover); border-color: var(--fx); }
 
 .chords-hint {
   font-size: 10px;

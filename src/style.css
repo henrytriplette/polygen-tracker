@@ -1,25 +1,47 @@
 /* polygen-tracker — dark-only tracker aesthetic.
-   High-contrast monospace on near-black; channel colors as identity. */
+   High-contrast monospace on near-black; channel colors as identity.
+
+   Visual hierarchy is built on stacked luminance layers (each ~4% brighter),
+   not on borders. Orange is reserved for selection/action/play only. */
 :root {
-  --bg: #0c0d10;
-  --panel: #131419;
-  --panel-raised: #1a1c23;
-  --border: #26282f;
+  /* --- Elevation layers (darkest -> brightest) ------------------------- */
+  --bg: #0c0d10;             /* workspace floor */
+  --panel: #14161c;          /* resting panels */
+  --panel-raised: #1c1f27;   /* headers / grouped panels */
+  --field: #23272f;          /* interactive input surface — reads as clickable */
+  --field-hover: #2b2f39;    /* input hover */
 
-  --text: #c9ccd4;
-  --text-dim: #6f7480;
-  --text-faint: #3d4049;
+  /* --- Borders: subtle by default, stronger only for editable/selected -- */
+  --border-subtle: #1e2027;  /* barely-there separation */
+  --border: #2b2e37;         /* editable-field outline */
+  --border-strong: #3a3e49;  /* hover / emphasis */
 
-  --accent: #ff8a2a; /* cursor / focus orange */
-  --fx: #8f7bd8;
+  /* --- Typography weights (mono, two-tier) ----------------------------- */
+  --text: #ced1d9;           /* primary label / value */
+  --text-bright: #f4f6fa;    /* emphasized value (bold) */
+  --text-dim: #7b808c;       /* secondary label */
+  --text-faint: #464a54;     /* tertiary / empty */
 
-  --ch-lead: #5dd97c;
+  /* --- Semantic palette (meaning, not decoration) ---------------------- */
+  --accent: #ff8a2a;         /* ONLY: selection · action · play · generate */
+  --accent-soft: rgba(255, 138, 42, 0.14);
+  --info: #4ecbe0;           /* informational highlight (cyan) */
+  --ref: #5a9cff;            /* references / linked data (blue) */
+  --fx: #a08ce6;             /* modulation / automation (purple) */
+
+  --ch-lead: #5dd97c;        /* green — melodic notes */
   --ch-harmony: #4ecbe0;
   --ch-bass: #e8c95a;
-  --ch-drums: #e86a5a;
+  --ch-drums: #e86a5a;       /* red — drum events */
 
-  --row-beat: rgba(255, 255, 255, 0.03);
+  --row-beat: rgba(255, 255, 255, 0.028);
+  --row-hi: rgba(255, 255, 255, 0.055);
   --row-live: var(--accent);
+
+  /* --- Depth ----------------------------------------------------------- */
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.02), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-raise: 0 1px 0 rgba(255, 255, 255, 0.04);
 
   --mono: 'JetBrains Mono', ui-monospace, Consolas, 'Cascadia Mono', monospace;
 
@@ -76,6 +98,12 @@ input[type='number']::-webkit-inner-spin-button {
 
 *::-webkit-scrollbar-thumb {
   background: var(--border);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }
 
 *::-webkit-scrollbar-track {

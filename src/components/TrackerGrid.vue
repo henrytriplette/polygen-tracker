@@ -271,16 +271,18 @@ function hasNote(ch: number, row: number): boolean {
 <style scoped>
 .grid-wrap {
   overflow: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
   background: var(--panel);
   outline: none;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-panel);
 }
 
 .grid-wrap:focus-within,
 .grid-wrap:focus {
-  border-color: var(--text-dim);
+  border-color: var(--border);
 }
 
 .grid {
@@ -288,24 +290,32 @@ function hasNote(ch: number, row: number): boolean {
   width: 100%;
   font-family: var(--mono);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
+/* --- Channel headers: each lane reads as a compact hardware module ------- */
 th {
   position: sticky;
   top: 0;
   background: var(--panel-raised);
-  border-bottom: 1px solid var(--border);
-  padding: 4px 6px;
+  border-bottom: 2px solid var(--bg);
+  padding: 6px 8px 7px;
   text-align: left;
   font-weight: 600;
   white-space: nowrap;
   z-index: 1;
 }
 
-.ch-head { border-left: 1px solid var(--border); }
+.ch-head {
+  border-left: 2px solid var(--bg);
+  box-shadow: inset 0 2px 0 currentColor;
+}
 
-.ch-name { margin-right: 8px; }
+.ch-name {
+  margin-right: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
 
 .ch-btns { display: inline-flex; gap: 2px; }
 
@@ -313,14 +323,14 @@ th {
   font-family: var(--mono);
   font-size: 10px;
   line-height: 1;
-  padding: 2px 5px;
-  background: var(--bg);
+  padding: 3px 5px;
+  background: var(--field);
   color: var(--text-dim);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
 }
 
-.mini:hover { color: var(--text); border-color: var(--text-dim); }
+.mini:hover { color: var(--text); border-color: var(--border-strong); background: var(--field-hover); }
 
 .mini.active {
   background: var(--accent);
@@ -330,22 +340,24 @@ th {
 
 .ch-vibe {
   display: block;
-  margin-top: 3px;
+  margin-top: 4px;
   font-family: var(--mono);
   font-size: 10px;
-  padding: 1px 3px;
-  background: var(--bg);
+  padding: 2px 4px;
+  background: var(--field);
   color: var(--text-dim);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   max-width: 110px;
 }
+
+.ch-vibe:hover { background: var(--field-hover); }
 
 .ch-vibe.overridden {
   color: var(--accent);
   border-color: var(--accent);
 }
 
-.ch-vibe.algo { margin-top: 2px; color: var(--fx); }
+.ch-vibe.algo { margin-top: 3px; color: var(--fx); }
 
 .ch-vibe.algo.overridden {
   color: var(--accent);
@@ -358,23 +370,27 @@ td {
 }
 
 .rownum {
-  color: var(--text-dim);
+  color: var(--text-faint);
   text-align: right;
   padding: 0 8px;
-  border-right: 1px solid var(--border);
+  border-right: 2px solid var(--bg);
+  background: var(--panel);
 }
 
+/* Lane separation comes from a dark seam, not a bright outline */
 .note {
-  border-left: 1px solid var(--border);
+  border-left: 2px solid var(--bg);
   cursor: pointer;
+  font-weight: 600;
 }
 
-.note:hover { background: rgba(255, 138, 42, 0.12); }
+.note:hover { background: var(--accent-soft); }
 
 .note.cursor {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
-  background: rgba(255, 138, 42, 0.18);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(255, 138, 42, 0.22);
+  color: var(--text-bright) !important;
 }
 
 .fx {
@@ -382,21 +398,23 @@ td {
   cursor: pointer;
 }
 
-.fx:hover { background: rgba(143, 123, 216, 0.12); }
+.fx:hover { background: rgba(160, 140, 230, 0.12); }
 
 .fx.cursor {
-  outline: 1px solid var(--fx);
-  outline-offset: -1px;
-  background: rgba(143, 123, 216, 0.18);
+  outline: 2px solid var(--fx);
+  outline-offset: -2px;
+  background: rgba(160, 140, 230, 0.2);
 }
 
-.empty { color: var(--text-faint); }
+.empty { color: var(--text-faint); font-weight: 400; }
 
 tr.beat td { background: var(--row-beat); }
 
+/* Active insertion row: obvious, but only when this pattern is playing */
 tr.live td {
   background: var(--row-live);
   color: #000 !important;
+  font-weight: 700;
 }
 
 tr.live td.rownum,
@@ -407,8 +425,8 @@ tr.live td.fx { color: rgba(0, 0, 0, 0.55) !important; }
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 4px 8px;
-  border-top: 1px solid var(--border);
+  padding: 5px 10px;
+  border-top: 1px solid var(--bg);
   background: var(--panel-raised);
   font-size: 10px;
   letter-spacing: 0.5px;
@@ -417,17 +435,19 @@ tr.live td.fx { color: rgba(0, 0, 0, 0.55) !important; }
   margin-top: auto;
 }
 
-.edit-active { color: var(--accent); white-space: nowrap; }
+.edit-active { color: var(--accent); white-space: nowrap; font-weight: 700; }
 
 .snap-btn {
   font-family: var(--mono);
   font-size: 10px;
-  padding: 1px 6px;
-  background: var(--bg);
+  padding: 2px 7px;
+  background: var(--field);
   color: var(--text-dim);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
 }
+
+.snap-btn:hover { background: var(--field-hover); }
 
 .snap-btn.active {
   color: var(--accent);

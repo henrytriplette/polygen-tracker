@@ -65,54 +65,66 @@ function labelAt(seqIdx: number): PatternLabel {
 .seq {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 6px 0;
+  padding: 7px 10px;
+  background: var(--panel);
+  border-radius: 4px;
+  box-shadow: var(--shadow-raise);
 }
 
 .seq-title {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-faint);
+  font-weight: 700;
 }
 
 .seq-chain {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   flex-wrap: wrap;
 }
 
 .seq-slot {
   font-family: var(--mono);
   font-size: 12px;
-  padding: 3px 7px;
-  background: var(--panel);
+  padding: 4px 8px;
+  background: var(--field);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
+  box-shadow: var(--shadow-raise);
 }
 
-.seq-slot:hover { border-color: var(--text-dim); }
+.seq-slot:hover { background: var(--field-hover); border-color: var(--border-strong); }
 
+/* Current view = selection → orange */
 .seq-slot.selected {
   border-color: var(--accent);
   color: var(--accent);
+  font-weight: 700;
 }
 
+/* Play state → orange fill */
 .seq-slot.playing {
   background: var(--accent);
   color: #000;
   border-color: var(--accent);
+  font-weight: 700;
 }
 
+/* Pattern slots are linked/reference data → blue accent on their role tag */
 .seq-slot .role {
   margin-left: 5px;
   font-size: 10px;
-  color: var(--text-dim);
+  color: var(--ref);
 }
 
 .seq-slot.regen { color: var(--fx); }
+.seq-slot.follow { color: var(--info); }
+.seq-slot.follow.selected { color: var(--accent); }
 
-.seq-slot.add { color: var(--text-dim); }
-.seq-slot.add:hover { color: var(--accent); border-color: var(--accent); }
+.seq-slot.add { color: var(--text-dim); background: transparent; box-shadow: none; }
+.seq-slot.add:hover { color: var(--accent); border-color: var(--accent); background: var(--field); }
 </style>
