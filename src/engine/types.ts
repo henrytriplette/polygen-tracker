@@ -103,6 +103,10 @@ export interface SongConfig {
 // Order matches the channels: [lead, harmony, bass, drums].
 export type ChannelVibes = [VibeName | null, VibeName | null, VibeName | null, VibeName | null];
 
+// Per-channel timbre override (archetype name from the sound palette):
+// null = vibe-weighted pick. Order matches the channels: [lead, harmony, bass, drums].
+export type ChannelSounds = [string | null, string | null, string | null, string | null];
+
 export interface Song {
   config: SongConfig;
   instruments: ZzFXSound[];
@@ -112,6 +116,8 @@ export interface Song {
   sequence: number[];
   patternOrder: PatternLabel[];
   channelVibes?: ChannelVibes;
+  /** Per-channel timbre override (archetype name); null = vibe-weighted pick. */
+  channelSounds?: ChannelSounds;
   /** Chord progression per pattern as scale degrees (one chord per 8 rows). */
   patternChords?: Record<PatternLabel, number[]>;
   /** Per-channel pattern-generator override: null = vibe-driven default. */

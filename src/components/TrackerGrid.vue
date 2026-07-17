@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, VIBE_GROUPS } from '../store';
+import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, CHANNEL_SOUND_OPTIONS, VIBE_GROUPS } from '../store';
 import { DRUM_NOTES, FX_VALUES, drumNoteToName, effectToDisplayString, noteToZzfxm, zzfxmToNoteName } from '../engine';
 import type { VibeName } from '../engine';
 
@@ -14,6 +14,11 @@ function onChannelVibe(ch: number, e: Event) {
 function onChannelAlgo(ch: number, e: Event) {
   const value = (e.target as HTMLSelectElement).value;
   store.setChannelAlgo(ch, value === '' ? null : value);
+}
+
+function onChannelSound(ch: number, e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  store.setChannelSound(ch, value === '' ? null : value);
 }
 
 // --- Note + FX editing ------------------------------------------------------
@@ -215,6 +220,16 @@ function hasNote(ch: number, row: number): boolean {
               <option value="">AUTO</option>
               <option v-for="a in CHANNEL_ALGO_OPTIONS[ch]" :key="a.value" :value="a.value">{{ a.label }}</option>
             </select>
+            <select
+              class="ch-vibe sound"
+              :class="{ overridden: !!state.song.channelSounds?.[ch] }"
+              :value="state.song.channelSounds?.[ch] ?? ''"
+              title="Timbre for this channel (AUTO = vibe-picked). Same part, different sound."
+              @change="onChannelSound(ch, $event)"
+            >
+              <option value="">AUTO ♪</option>
+              <option v-for="s in CHANNEL_SOUND_OPTIONS[ch]" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
           </th>
         </tr>
       </thead>
@@ -360,6 +375,13 @@ th {
 .ch-vibe.algo { margin-top: 3px; color: var(--fx); }
 
 .ch-vibe.algo.overridden {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ch-vibe.sound { margin-top: 3px; color: var(--info); }
+
+.ch-vibe.sound.overridden {
   color: var(--accent);
   border-color: var(--accent);
 }

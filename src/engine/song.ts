@@ -8,6 +8,7 @@ import {
   PatternEffects,
   ChannelEffects,
   ChannelVibes,
+  ChannelSounds,
   NoteEffect,
   VibeName,
 } from './types';
@@ -212,6 +213,7 @@ export function generateSong(
   channelVibes?: ChannelVibes,
   channelAlgos?: ChannelAlgos,
   structureId?: string | null,
+  channelSounds?: ChannelSounds,
 ): Song {
   const vibe: VibeName = config?.vibe ?? 'adventure';
   const vibeConfig = VIBE_CONFIG[vibe];
@@ -228,8 +230,9 @@ export function generateSong(
 
   const vibes: ChannelVibes = channelVibes ?? [null, null, null, null];
   const algos: ChannelAlgos = channelAlgos ?? [null, null, null, null];
+  const sounds: ChannelSounds = channelSounds ?? [null, null, null, null];
   const instruments = [0, 1, 2, 3].map((ch) =>
-    generateInstrumentForChannel(vibes[ch] ?? vibe, ch)
+    generateInstrumentForChannel(vibes[ch] ?? vibe, ch, sounds[ch])
   );
 
   // Pick a structure template: named structure override, or vibe + length
@@ -264,6 +267,7 @@ export function generateSong(
     patternOrder,
     channelVibes: vibes,
     channelAlgos: algos,
+    channelSounds: sounds,
     patternChords,
     structureId: structureId ?? null,
   };
@@ -286,7 +290,8 @@ export function regenerateForVibe(song: Song, newVibe: VibeName): Song {
     },
     song.channelVibes,
     song.channelAlgos,
-    song.structureId
+    song.structureId,
+    song.channelSounds
   );
 }
 
@@ -617,7 +622,7 @@ export function applyChannelVibe(song: Song, channelIndex: number, vibe: VibeNam
 
   const instruments = song.instruments.map(i => [...i]);
   instruments[channelIndex] = generateInstrumentForChannel(
-    vibe ?? song.config.vibe, channelIndex
+    vibe ?? song.config.vibe, channelIndex, song.channelSounds?.[channelIndex]
   );
 
   let next: Song = { ...song, channelVibes, instruments };
@@ -632,6 +637,22 @@ export function applyChannelVibe(song: Song, channelIndex: number, vibe: VibeNam
   }
 
   return next;
+}
+
+/**
+ * Set (or clear, with null) one channel's timbre override from the sound
+ * palette and rebuild only that channel's instrument. The notes are left
+ * untouched \u2014 a different sound plays the same part.
+ */
+export function applyChannelSound(song: Song, channelIndex: number, sound: string | null): Song {
+  const channelSounds = [...(song.channelSounds ?? [null, null, null, null])] as ChannelSounds;
+  channelSounds[channelIndex] = sound;
+
+  const vibe = song.channelVibes?.[channelIndex] ?? song.config.vibe;
+  const instruments = song.instruments.map(i => [...i]);
+  instruments[channelIndex] = generateInstrumentForChannel(vibe, channelIndex, sound);
+
+  return { ...song, channelSounds, instruments };
 }
 
 // --- CHANNEL EXPANSION ---

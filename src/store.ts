@@ -7,6 +7,7 @@ import {
   addPatternToSong,
   applyChannelAlgo,
   applyChannelVibe,
+  applyChannelSound,
   applyChordsToPattern,
   applySongStructure,
   floatsToWav,
@@ -28,6 +29,10 @@ import {
 } from './engine';
 import type { ChannelAlgos, NoteEffect, Pattern, PatternEffects } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
+
+// Selectable timbre palette per channel (re-exported from the engine so the
+// grid can render it next to the vibe/algo pickers). null = AUTO.
+export { CHANNEL_SOUND_OPTIONS } from './engine';
 
 // Selectable pattern algorithms per channel (null = AUTO, the vibe default)
 export const CHANNEL_ALGO_OPTIONS: { value: string; label: string }[][] = [
@@ -307,7 +312,8 @@ export const store = {
         { vibe: state.song.config.vibe, length: state.song.config.length },
         state.song.channelVibes,
         state.song.channelAlgos,
-        state.song.structureId
+        state.song.structureId,
+        state.song.channelSounds
       )
     );
     state.selectedPattern = state.song.patternOrder[0];
@@ -467,6 +473,11 @@ export const store = {
 
   setChannelAlgo(ch: number, algo: string | null): void {
     state.song = applyChannelAlgo(state.song, ch, algo as ChannelAlgos[number]);
+    swapAudio();
+  },
+
+  setChannelSound(ch: number, sound: string | null): void {
+    state.song = applyChannelSound(state.song, ch, sound);
     swapAudio();
   },
 

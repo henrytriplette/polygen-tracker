@@ -598,9 +598,12 @@ const VIBE_TRAITS: Record<VibeName, Record<ChannelRole, VibeTraitConfig>> = {
 function buildInstrument(
   archetypes: Archetype[],
   config: VibeTraitConfig,
+  forcedName?: string | null,
 ): ZzFXSound {
-  // 1. Pick archetype
-  const archetype = weightedPick(archetypes, config.archetypeWeights);
+  // 1. Pick archetype — an explicit name wins, else weighted by the vibe
+  const archetype =
+    (forcedName ? archetypes.find((a) => a.name === forcedName) : undefined) ??
+    weightedPick(archetypes, config.archetypeWeights);
   const params = [...archetype.params] as ZzFXSound;
 
   // 2. Pick and apply traits
@@ -633,12 +636,28 @@ const ROLE_ARCHETYPES: Record<ChannelRole, Archetype[]> = {
 };
 
 // Build one channel's instrument from a specific vibe — used when a channel
-// has its own vibe override.
-export function generateInstrumentForChannel(vibe: VibeName, channelIndex: number): ZzFXSound {
+// has its own vibe override. An optional `sound` forces a named archetype
+// (the selectable timbre palette); null/undefined = vibe-weighted pick.
+export function generateInstrumentForChannel(
+  vibe: VibeName,
+  channelIndex: number,
+  sound?: string | null,
+): ZzFXSound {
   const role = CHANNEL_ROLES[channelIndex] ?? 'lead';
-  return buildInstrument(ROLE_ARCHETYPES[role], VIBE_TRAITS[vibe][role]);
+  return buildInstrument(ROLE_ARCHETYPES[role], VIBE_TRAITS[vibe][role], sound);
 }
 
 export function generateInstruments(vibe: VibeName): ZzFXSound[] {
   return CHANNEL_ROLES.map((_, ch) => generateInstrumentForChannel(vibe, ch));
 }
+
+// Selectable timbre palette per channel — the named archetypes for each role.
+// Index matches the channel order [lead, harmony, bass, drums]; a null choice
+// (AUTO) falls back to the vibe-weighted pick.
+export const CHANNEL_SOUND_OPTIONS: { value: string; label: string }[][] =
+  CHANNEL_ROLES.map((role) =>
+    ROLE_ARCHETYPES[role].map((a) => ({
+      value: a.name,
+      label: a.name.replace(/-/g, ' ').toUpperCase(),
+    }))
+  );

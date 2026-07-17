@@ -1,10 +1,10 @@
-export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, applyChannelVibe, applyChannelAlgo, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
+export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, applyChannelVibe, applyChannelAlgo, applyChannelSound, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
 export { STRUCTURE_OPTIONS, findStructure } from './structures';
 export { mutatePattern } from './mutate';
 export { withSeed, randomSeed } from './random';
 export type { StructureOption } from './structures';
 export type { ChannelAlgos, LeadAlgo, HarmonyAlgo, BassAlgo, DrumAlgo } from './altPatterns';
-export { generateInstruments, generateInstrumentForChannel } from './instruments';
+export { generateInstruments, generateInstrumentForChannel, CHANNEL_SOUND_OPTIONS } from './instruments';
 export { ZZFX, zzfxP, zzfxMChannels, unlockAudio, getAnalyser, floatsToWav } from './zzfx';
 export { AudioGraph } from './audioGraph';
 export { CHROMATIC, SCALES, getScaleNotes, zzfxmToNoteName, noteToZzfxm, snapNoteToScale } from './scales';
@@ -25,6 +25,7 @@ export type {
   PatternEffects,
   ChannelEffects,
   ChannelVibes,
+  ChannelSounds,
   NoteEffect,
   EffectCode,
   NoteName,
