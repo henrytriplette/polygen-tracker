@@ -84,9 +84,10 @@ export async function runRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 
 
     const label = song.patternOrder[p];
     const source = song.patterns[label];
+    const rows = Math.max(0, (source[0]?.length ?? 2) - 2);
     // Channels map 1:1 onto tracks and instrument slots.
     for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
-      for (let row = 0; row < 32; row++) {
+      for (let row = 0; row < rows; row++) {
         const srcNote = source[ch][row + 2];
         const step = parsed.tracks[ch].steps[row];
         if (srcNote <= 0) {
@@ -150,8 +151,9 @@ export async function runPatternsRoundtrip(existingSong?: Song, trackCount: 8 | 
     }
     if (parsed.trackCount !== trackCount) errors.push(`${name}: trackCount ${parsed.trackCount} != ${trackCount}`);
     const source = song.patterns[song.patternOrder[p]];
+    const rows = Math.max(0, (source[0]?.length ?? 2) - 2);
     for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
-      for (let row = 0; row < 32; row++) {
+      for (let row = 0; row < rows; row++) {
         const srcNote = source[ch][row + 2];
         const step = parsed.tracks[ch].steps[row];
         if (srcNote <= 0 && step.note !== -1) errors.push(`${name} ch${ch} row${row}: expected empty`);

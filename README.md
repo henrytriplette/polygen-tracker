@@ -6,6 +6,7 @@ Click GENERATE and get a complete 4-channel retro song — lead, harmony, bass, 
 
 ## Features
 
+- **Variable pattern length (16/32/64/128 rows)** — a row is a 16th note, so length changes how long a pattern *runs*, not how fast it plays. Content repeats at its natural period rather than stretching: the 8-slot rhythm figures cycle every 8 rows, drum templates every 32, and the chord progression always divides the pattern into four equal segments. Exports declare the real track length, so the hardware plays it back at the right size
 - **8 channels, matching the Polyend's 8 audio tracks** — LEAD, HARM, BASS, KICK, SNR, HAT, ARP, PAD. Each drum gets its own track (so a kick and hat can sound on the same row), and the ARP/PAD channels fill out the arrangement. Channels map 1:1 onto tracks and instrument slots on export
 - **Instant song generation** — drums (kick templates + probability), bass (Euclidean rhythms), melody (constrained random walk with motifs), harmony (arpeggiated chord tones), arpeggios and sustained pads, all locked to the chosen key/scale
 - **Selectable song structures** — AUTO uses each vibe's own genre forms, or pick a named structure that works with any vibe: VERSE-CHORUS, VERSE-REFRAIN, AABA (32-bar), HOOK-FIRST (opens on the chorus), BUILD-DROP, LOOP, or THROUGH-COMPOSED. Section roles now include **chorus** (denser hook, ×1.3 melody) and **refrain** (prominent lead line over thinned backing) alongside verse/contrast/bridge/breakdown/climax

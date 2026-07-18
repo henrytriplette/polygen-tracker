@@ -1,8 +1,8 @@
-import { VibeName, NoteName, ScaleName } from './types';
+import {
+  VibeName, NoteName, ScaleName,
+  CHORD_SEGMENTS, DEFAULT_PATTERN_LENGTH, rowsPerChord,
+} from './types';
 import { CHROMATIC, SCALES, noteToZzfxm } from './scales';
-
-const ROWS = 32;
-const ROWS_PER_CHORD = 8; // 4 chords per 32-row pattern
 
 // Chord quality: which scale degrees make up the chord (0-indexed from chord root)
 // In a 7-note scale, triad = root + 2 degrees up + 4 degrees up
@@ -182,18 +182,23 @@ export function randomProgressionDegrees(vibe: VibeName): number[] {
   return [...pickWeighted(PROGRESSIONS[vibe]).degrees];
 }
 
-/** Build a playable progression from explicit scale degrees (user-editable). */
+/**
+ * Build a playable progression from explicit scale degrees (user-editable).
+ * The chords always split the pattern into four equal segments, so
+ * `chordAtRow.length` doubles as the pattern length for the generators.
+ */
 export function progressionFromDegrees(
   degrees: number[],
   key: NoteName,
-  scale: ScaleName
+  scale: ScaleName,
+  length: number = DEFAULT_PATTERN_LENGTH
 ): ChordProgression {
   const chords = degrees.map(degree => buildChord(degree, key, scale, 3, 4));
 
-  // Map each row to its chord (8 rows per chord)
+  const perChord = rowsPerChord(length);
   const chordAtRow: ChordInfo[] = [];
-  for (let i = 0; i < ROWS; i++) {
-    const chordIdx = Math.min(Math.floor(i / ROWS_PER_CHORD), chords.length - 1);
+  for (let i = 0; i < length; i++) {
+    const chordIdx = Math.min(Math.floor(i / perChord), chords.length - 1);
     chordAtRow.push(chords[chordIdx]);
   }
 
@@ -203,9 +208,10 @@ export function progressionFromDegrees(
 export function generateChordProgression(
   vibe: VibeName,
   key: NoteName,
-  scale: ScaleName
+  scale: ScaleName,
+  length: number = DEFAULT_PATTERN_LENGTH
 ): ChordProgression {
-  return progressionFromDegrees(randomProgressionDegrees(vibe), key, scale);
+  return progressionFromDegrees(randomProgressionDegrees(vibe), key, scale, length);
 }
 
 /**
@@ -233,4 +239,4 @@ export function chordDisplayName(degree: number, key: NoteName, scale: ScaleName
 }
 
 /** Number of chords a pattern progression holds (one per 8 rows). */
-export const CHORDS_PER_PATTERN = ROWS / ROWS_PER_CHORD;
+export const CHORDS_PER_PATTERN = CHORD_SEGMENTS;

@@ -37,7 +37,7 @@ function isSong(value: unknown): value is Song {
   );
 }
 
-const ROWS = 32;
+const LEGACY_ROWS = 32; // songs from before variable pattern length
 
 /**
  * Songs saved before the 8-channel split have 4 channels
@@ -49,7 +49,8 @@ export function migrateSong(song: Song): Song {
   const firstPattern = song.patterns[song.patternOrder[0]];
   if (!firstPattern || firstPattern.length >= CHANNEL_COUNT) return song;
 
-  const silent = (ch: number) => [ch, 0, ...Array(ROWS).fill(0)];
+  const rows = Math.max(1, (firstPattern[0]?.length ?? LEGACY_ROWS + 2) - 2);
+  const silent = (ch: number) => [ch, 0, ...Array(rows).fill(0)];
 
   const patterns: Song['patterns'] = { ...song.patterns };
   const patternEffects: Song['patternEffects'] = { ...song.patternEffects };
@@ -62,7 +63,7 @@ export function migrateSong(song: Song): Song {
     const kick = silent(CH_KICK);
     const snare = silent(CH_SNARE);
     const hat = silent(CH_HAT);
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < rows; row++) {
       const note = oldDrums[row + 2] ?? 0;
       if (note <= 0) continue;
       const target = note <= 6 ? kick : note <= DRUM_NOTES.SNARE + 8 ? snare : hat;
@@ -73,7 +74,7 @@ export function migrateSong(song: Song): Song {
 
     const oldFx = song.patternEffects?.[label];
     if (oldFx) {
-      const empty = () => Array(ROWS).fill(null);
+      const empty = () => Array(rows).fill(null);
       patternEffects[label] = [
         oldFx[0] ?? empty(),
         oldFx[1] ?? empty(),

@@ -35,7 +35,7 @@ export interface PolyendExportOptions {
   trackCount?: 8 | 12 | 16;
 }
 
-const ROWS = 32;
+
 const ZZFXM_TO_POLYEND = 36; // zzfxm note 12 (C4) -> Polyend note byte 48 (C4)
 const POLYEND_C4 = 48;
 
@@ -115,6 +115,7 @@ export function buildPatternData(
 ): ReturnType<typeof Tracker.createPattern> {
   const source = song.patterns[label];
   const effects = song.patternEffects?.[label];
+  const ROWS = Math.max(1, (source[0]?.length ?? 34) - 2);
   const pattern = Tracker.createPattern(trackCount, ROWS);
 
   const swing = Math.max(0, Math.min(30, song.config.swing ?? 0));

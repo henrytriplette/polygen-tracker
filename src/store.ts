@@ -30,10 +30,15 @@ import {
 import {
   CHANNELS,
   CHANNEL_COUNT,
+  DEFAULT_PATTERN_LENGTH,
   DRUM_HIT_NOTE,
+  PATTERN_LENGTHS,
   generateInstrumentForChannel,
   isDrumChannel,
 } from './engine';
+import type { PatternLength } from './engine';
+
+export { PATTERN_LENGTHS };
 import type { ChannelAlgos, NoteEffect, Pattern, PatternEffects } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
 
@@ -236,6 +241,12 @@ function renderBuffers(song: Song): { buffers: [number[], number[]][]; duration:
   return { buffers, duration };
 }
 
+/** Rows in this song's patterns (older songs are 32). */
+function patternRows(): number {
+  const first = state.song.patterns[state.song.patternOrder[0]];
+  return Math.max(1, (first?.[0]?.length ?? 34) - 2);
+}
+
 function applyGains(): void {
   if (!graph) return;
   for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
@@ -249,10 +260,11 @@ function tickPlayhead(): void {
   const pos = graph.getPosition();
   const rowDuration = 60 / graph.bpm / 4;
   // The zzfxm renderer drops the very first beat, so position 0 is row 1.
-  const totalRows = state.song.sequence.length * 32 - 1;
+  const rows = patternRows();
+  const totalRows = state.song.sequence.length * rows - 1;
   const globalRow = (Math.floor(pos / rowDuration) + 1) % (totalRows + 1);
-  state.playSeqIdx = Math.min(Math.floor(globalRow / 32), state.song.sequence.length - 1);
-  state.playRow = globalRow % 32;
+  state.playSeqIdx = Math.min(Math.floor(globalRow / rows), state.song.sequence.length - 1);
+  state.playRow = globalRow % rows;
   if (state.follow) {
     const playing = state.song.patternOrder[state.song.sequence[state.playSeqIdx]];
     if (playing && playing !== state.selectedPattern) state.selectedPattern = playing;
@@ -396,6 +408,20 @@ export const store = {
     afterSongChange();
   },
 
+  /** Change rows per pattern; regenerates every pattern at the new length. */
+  setPatternLength(rows: PatternLength): void {
+    if (rows === (state.song.config.patternLength ?? DEFAULT_PATTERN_LENGTH)) return;
+    const withLength: Song = {
+      ...state.song,
+      config: { ...state.song.config, patternLength: rows },
+    };
+    state.song = keepLockedInstruments(
+      regenerateAllPatterns(withLength, { patternLength: rows }),
+      state.song
+    );
+    afterSongChange();
+  },
+
   setLength(length: SongLength): void {
     if (length === state.song.config.length) return;
     state.song = keepLockedInstruments(regenerateWithNewLength(state.song, length), state.song);
@@ -529,8 +555,9 @@ export const store = {
   setEffect(ch: number, row: number, effect: NoteEffect | null): void {
     const label = state.selectedPattern;
     const existing = state.song.patternEffects?.[label];
+    const rows = patternRows();
     const effects = Array.from({ length: CHANNEL_COUNT }, (_, c) => [
-      ...(existing?.[c] ?? Array(32).fill(null)),
+      ...(existing?.[c] ?? Array(rows).fill(null)),
     ]) as PatternEffects;
     effects[ch][row] = effect;
     state.song = {
@@ -724,7 +751,8 @@ export const store = {
 
     for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
       const track = parsed.tracks[ch];
-      for (let row = 0; row < 32; row++) {
+      const rows = patternRows();
+      for (let row = 0; row < rows; row++) {
         const step = track?.steps[row];
         if (!step || step.note < 0) {
           pattern[ch][row + 2] = 0;

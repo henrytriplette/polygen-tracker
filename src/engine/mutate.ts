@@ -15,7 +15,7 @@ import {
 import { getScaleNotes } from './scales';
 import { progressionFromDegrees, CHORDS_PER_PATTERN } from './chords';
 
-const ROWS = 32;
+
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -34,10 +34,11 @@ export function mutatePattern(song: Song, label: PatternLabel): Pattern {
   const source = song.patterns[label];
   const pattern = source.map((c) => [...c]) as Pattern;
   const { key, scale } = song.config;
+  const ROWS = Math.max(0, (source[0]?.length ?? 2) - 2);
 
   const degrees =
     song.patternChords?.[label] ?? Array(CHORDS_PER_PATTERN).fill(0);
-  const progression = progressionFromDegrees(degrees, key, scale);
+  const progression = progressionFromDegrees(degrees, key, scale, ROWS);
   const scalePool = getScaleNotes(key, scale, 4, 5).map((n) => n.note);
 
   const rowsWithNotes = (ch: number) => {

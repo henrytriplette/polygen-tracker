@@ -131,6 +131,34 @@ export function drumNoteToName(note: number): string {
 
 export type SongLength = 'short' | 'long' | 'epic';
 
+//----------------------------------
+// Pattern length
+//----------------------------------
+// A row is always a 16th note, so length changes how LONG a pattern is, not
+// how fast it plays. Content therefore repeats at its natural period rather
+// than stretching: 8-slot rhythm templates cycle every 8 rows, drum templates
+// every 32, and the chord progression always divides the pattern into four
+// equal segments.
+
+export type PatternLength = 16 | 32 | 64 | 128;
+
+export const PATTERN_LENGTHS: PatternLength[] = [16, 32, 64, 128];
+
+export const DEFAULT_PATTERN_LENGTH: PatternLength = 32;
+
+/** Period of the 8-slot melody/bass/harmony rhythm templates. */
+export const RHYTHM_PERIOD = 8;
+
+/** Period of the drum templates (they are written across 32 rows). */
+export const DRUM_PERIOD = 32;
+
+/** Chords per pattern — always four, whatever the length. */
+export const CHORD_SEGMENTS = 4;
+
+export function rowsPerChord(length: number): number {
+  return Math.max(1, Math.floor(length / CHORD_SEGMENTS));
+}
+
 // Section roles define HOW a unique pattern is generated
 export type SectionRole =
   | 'verse'      // main theme, full arrangement
@@ -154,6 +182,8 @@ export interface SongConfig {
   scale: ScaleName;
   bpm: number;
   length: SongLength;
+  /** Rows per pattern (16/32/64/128). Defaults to 32 for older songs. */
+  patternLength?: PatternLength;
   /** Swing amount in percent (0-30): odd 16th rows play late. */
   swing?: number;
   /** Velocity humanization in percent (0-30): random per-note attenuation. */

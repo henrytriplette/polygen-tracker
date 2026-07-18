@@ -36,7 +36,14 @@ export {
   isDrumChannel,
   channelFamily,
   effectToDisplayString,
+  PATTERN_LENGTHS,
+  DEFAULT_PATTERN_LENGTH,
+  RHYTHM_PERIOD,
+  DRUM_PERIOD,
+  CHORD_SEGMENTS,
+  rowsPerChord,
 } from './types';
+export type { PatternLength } from './types';
 export { euclidean } from './euclidean';
 export { VIBE_CONFIG, getRandomBpm } from './vibes';
 export { generateChordProgression, progressionFromDegrees, randomProgressionDegrees, chordDisplayName, CHORDS_PER_PATTERN } from './chords';

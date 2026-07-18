@@ -64,7 +64,7 @@ function moveCursor(dCol: number, dRow: number) {
   cursor.value = {
     ch: Math.floor(col / 2),
     lane: col % 2 === 0 ? 'note' : 'fx',
-    row: (row + dRow + 32) % 32,
+    row: (row + dRow + rowCount.value) % rowCount.value,
   };
 }
 
@@ -152,6 +152,8 @@ function onKey(e: KeyboardEvent) {
 }
 
 const pattern = computed(() => state.song.patterns[state.selectedPattern]);
+/** Rows in the selected pattern (drives the grid and cursor wrapping). */
+const rowCount = computed(() => Math.max(1, (pattern.value?.[0]?.length ?? 34) - 2));
 const effects = computed(() => state.song.patternEffects?.[state.selectedPattern]);
 
 // The playhead only lights up rows when the selected pattern is the one playing.
@@ -243,7 +245,7 @@ function hasNote(ch: number, row: number): boolean {
       </thead>
       <tbody>
         <tr
-          v-for="row in 32"
+          v-for="row in rowCount"
           :key="row"
           :class="{ beat: (row - 1) % 4 === 0, live: liveRow === row - 1 }"
         >

@@ -1,7 +1,7 @@
 import {
   EffectCode, NoteEffect, ChannelEffects, PatternEffects,
   ZzFXSound, SongConfig, SectionRole, VibeName, Pattern,
-  ChannelFamily, CHANNEL_COUNT, CH_KICK, CH_SNARE, CH_HAT,
+  ChannelFamily, CHANNEL_COUNT, CH_KICK, CH_SNARE, CH_HAT, RHYTHM_PERIOD,
   channelFamily, isDrumChannel,
 } from './types';
 import { VIBE_CONFIG } from './vibes';
@@ -233,11 +233,12 @@ function classifyPositions(notes: number[]): Record<PositionType, number[]> {
   const phraseEnd: number[] = [];
   const heldNote: number[] = [];
 
-  for (let row = 0; row < 32; row++) {
+  const length = notes.length;
+  for (let row = 0; row < length; row++) {
     if (notes[row] <= 0) continue;
 
-    const phrasePos = row % 8;
-    const nextIsRest = row + 1 >= 32 || notes[row + 1] <= 0;
+    const phrasePos = row % RHYTHM_PERIOD;
+    const nextIsRest = row + 1 >= length || notes[row + 1] <= 0;
 
     if (phrasePos === 0) phraseStart.push(row);
     if (phrasePos >= 6 && nextIsRest) phraseEnd.push(row);
@@ -258,12 +259,13 @@ function selectPositions(
 
   const result: number[] = [];
 
-  // First pass: find mirrored pairs (row N and row N+16)
-  // Placing effects at both creates the musical repetition the user wants.
+  // First pass: find mirrored pairs (row N and its counterpart half a pattern
+  // away). Placing effects at both creates the musical repetition we want.
+  const half = Math.max(1, Math.floor(notes.length / 2));
   const used = new Set<number>();
   for (const pos of candidates) {
     if (used.has(pos)) continue;
-    const mirror = pos < 16 ? pos + 16 : pos - 16;
+    const mirror = pos < half ? pos + half : pos - half;
     if (candidates.includes(mirror) && notes[mirror] > 0 && !used.has(mirror)) {
       if (result.length + 2 <= budget) {
         result.push(pos, mirror);
@@ -295,17 +297,18 @@ export function generateChannelEffects(
   role: SectionRole,
   vibeOverride?: VibeName,
 ): ChannelEffects {
-  if (channelIndex >= CHANNEL_COUNT) return Array(32).fill(null);
+  const rows = notes.length;
+  if (channelIndex >= CHANNEL_COUNT) return Array(rows).fill(null);
   const family = channelFamily(channelIndex);
   const pool = FAMILY_FX_POOLS[family];
-  if (!pool || pool.length === 0) return Array(32).fill(null);
+  if (!pool || pool.length === 0) return Array(rows).fill(null);
 
   const budget = ROLE_BUDGETS[role][FAMILY_FX_INDEX[family]] ?? 0;
-  if (budget <= 0) return Array(32).fill(null);
+  if (budget <= 0) return Array(rows).fill(null);
 
   // Get this vibe's ranked effects for this channel's family
   const vibePrefs = VIBE_CHANNEL_FX[vibeOverride ?? config.vibe][FAMILY_FX_INDEX[family]];
-  if (!vibePrefs || vibePrefs.length === 0) return Array(32).fill(null);
+  if (!vibePrefs || vibePrefs.length === 0) return Array(rows).fill(null);
 
   // Each drum channel places its own effect on its strongest hits
   if (isDrumChannel(channelIndex)) {
@@ -354,7 +357,7 @@ export function generateChannelEffects(
   }
 
   // Build the effects array
-  const effects: (NoteEffect | null)[] = Array(32).fill(null);
+  const effects: (NoteEffect | null)[] = Array(rows).fill(null);
 
   for (const pos of primaryPositions) {
     effects[pos] = { code: primaryEffect, value: FX_VALUES[primaryEffect] };
@@ -376,7 +379,7 @@ function generateDrumEffects(
   notes: number[],
   budget: number,
 ): ChannelEffects {
-  const effects: (NoteEffect | null)[] = Array(32).fill(null);
+  const effects: (NoteEffect | null)[] = Array(notes.length).fill(null);
   const code = DRUM_CHANNEL_EFFECT[channelIndex];
   if (!code) return effects;
 
@@ -385,7 +388,7 @@ function generateDrumEffects(
   if (effectiveBudget <= 0) return effects;
 
   const hits: number[] = [];
-  for (let row = 0; row < 32; row++) if (notes[row] > 0) hits.push(row);
+  for (let row = 0; row < notes.length; row++) if (notes[row] > 0) hits.push(row);
 
   const sorted = [...hits].sort((a, b) => {
     const aDown = a % 8 === 0 ? 0 : 1;

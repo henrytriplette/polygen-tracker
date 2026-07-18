@@ -1,8 +1,7 @@
-import { NoteName, ScaleName, ChannelData } from './types';
+import { NoteName, ScaleName, ChannelData, RHYTHM_PERIOD, rowsPerChord } from './types';
 import { ChordProgression } from './chords';
 
-const ROWS = 32;
-const ROWS_PER_CHORD = 8;
+const ROWS_PER_CHORD = RHYTHM_PERIOD;
 
 // Harmony patterns for one chord segment
 // These define how chord tones are arpeggiated
@@ -73,37 +72,29 @@ export function generateHarmonyPattern(
   melodyNotes: number[],
   progression: ChordProgression
 ): ChannelData {
-  const notes: number[] = [];
+  const length = progression.chordAtRow.length;
+  const perChord = rowsPerChord(length);
 
-  // Pick one arp pattern for the whole pattern (consistency)
-  // But allow a second pattern for contrast in chords 2&4
+  // One arp pattern throughout for consistency, with a 40% chance of a
+  // contrasting one on alternate chord segments.
   const arpA = pickArpPattern(melodyNotes);
-  const arpB = Math.random() < 0.4
-    ? pickArpPattern(melodyNotes)  // 40% chance of contrasting pattern
-    : arpA;                         // 60% same pattern throughout
+  const arpB = Math.random() < 0.4 ? pickArpPattern(melodyNotes) : arpA;
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const chord = progression.chords[chordIdx];
-    const arp = (chordIdx % 2 === 0) ? arpA : arpB;
+  const notes: number[] = Array(length).fill(0);
+  for (let row = 0; row < length; row++) {
+    // The arp figure repeats every ROWS_PER_CHORD rows regardless of length
+    const arp = Math.floor(row / perChord) % 2 === 0 ? arpA : arpB;
+    const chord = progression.chordAtRow[row];
 
-    for (let i = 0; i < ROWS_PER_CHORD; i++) {
-      const globalRow = chordIdx * ROWS_PER_CHORD + i;
-      const melodyActive = melodyNotes[globalRow] > 0;
+    // If the melody is playing on this row, usually rest to avoid clutter
+    if (melodyNotes[row] > 0 && Math.random() < 0.7) continue;
 
-      // If melody is playing on this row, 70% chance harmony rests
-      // to avoid harmonic clutter
-      if (melodyActive && Math.random() < 0.7) {
-        notes.push(0);
-        continue;
-      }
-
-      notes.push(resolveArpNote(
-        arp[i],
-        chord.rootMelody,
-        chord.thirdMelody,
-        chord.fifthMelody,
-      ));
-    }
+    notes[row] = resolveArpNote(
+      arp[row % ROWS_PER_CHORD],
+      chord.rootMelody,
+      chord.thirdMelody,
+      chord.fifthMelody,
+    );
   }
 
   return [1, 0, ...notes];

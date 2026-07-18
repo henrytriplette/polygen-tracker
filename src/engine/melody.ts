@@ -1,9 +1,8 @@
-import { NoteName, ScaleName, ChannelData } from './types';
+import { NoteName, ScaleName, ChannelData, RHYTHM_PERIOD, rowsPerChord } from './types';
 import { getScaleNotes } from './scales';
 import { ChordProgression } from './chords';
 
-const ROWS = 32;
-const ROWS_PER_CHORD = 8;
+const ROWS_PER_CHORD = RHYTHM_PERIOD; // one phrase block
 
 // Melody rhythm templates — where notes land within an 8-row chord segment
 // These create recognizable, musical phrase shapes
@@ -95,21 +94,27 @@ export function generateMelodyPattern(
   density: number,
   progression: ChordProgression
 ): ChannelData {
+  // The progression spans the whole pattern, so it tells us the length.
+  const length = progression.chordAtRow.length;
+  const perChord = rowsPerChord(length);
+
   const scaleNotes = getScaleNotes(key, scale, 4, 5).map(n => n.note);
   if (scaleNotes.length === 0) {
-    return [0, 0, ...Array(ROWS).fill(0)];
+    return [0, 0, ...Array(length).fill(0)];
   }
 
-  const notes: number[] = [];
-
-  // Pick 2 rhythm templates — one for phrases 1&3, one for phrases 2&4
-  // This creates ABAB or ABAC phrase structure (repetition = musicality)
+  // Two rhythm templates alternating per chord segment gives ABAB phrasing.
   const rhythmA = pickRhythm(density);
   const rhythmB = pickRhythm(density);
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
+  // Phrases are built one RHYTHM_PERIOD block at a time so the groove keeps
+  // its period no matter how long the pattern is.
+  const notes: number[] = Array(length).fill(0);
+  for (let start = 0; start < length; start += RHYTHM_PERIOD) {
+    const blockLength = Math.min(RHYTHM_PERIOD, length - start);
+    const chordIdx = Math.min(Math.floor(start / perChord), progression.chords.length - 1);
     const chord = progression.chords[chordIdx];
-    const rhythm = (chordIdx % 2 === 0) ? rhythmA : rhythmB;
+    const rhythm = Math.floor(start / perChord) % 2 === 0 ? rhythmA : rhythmB;
 
     const phrase = generatePhrase(
       chord.rootMelody,
@@ -118,15 +123,15 @@ export function generateMelodyPattern(
       rhythm,
       scaleNotes,
     );
-
-    notes.push(...phrase);
+    for (let i = 0; i < blockLength; i++) notes[start + i] = phrase[i];
   }
 
-  // Repetition pass: 30% chance to copy phrase 1 to phrase 3 exactly
-  // This creates the "theme" feel of game music
+  // Repetition pass: 30% chance to restate the opening phrase halfway through,
+  // which is what makes a melody feel like a theme rather than a walk.
   if (Math.random() < 0.3) {
-    for (let i = 0; i < ROWS_PER_CHORD; i++) {
-      notes[16 + i] = notes[i]; // copy chord 1 phrase to chord 3
+    const half = Math.floor(length / 2);
+    for (let i = 0; i < Math.min(perChord, length - half); i++) {
+      notes[half + i] = notes[i];
     }
   }
 

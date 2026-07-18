@@ -6,7 +6,7 @@ import type { Song } from '../engine';
 
 const PPQ = 96;
 const TICKS_PER_ROW = PPQ / 4;
-const ROWS = 32;
+
 
 const TRACK_NAMES = ['Lead', 'Harmony', 'Bass', 'Kick', 'Snare', 'Hat', 'Arp', 'Pad'];
 
@@ -75,6 +75,7 @@ export function buildMidiFile(song: Song): Blob {
   song.sequence.forEach((patternIdx, seqPos) => {
     const label = song.patternOrder[patternIdx];
     const pattern = song.patterns[label];
+    const ROWS = Math.max(0, (pattern?.[0]?.length ?? 2) - 2);
     const baseTick = seqPos * ROWS * TICKS_PER_ROW;
 
     for (let ch = 0; ch < CHANNEL_COUNT; ch++) {

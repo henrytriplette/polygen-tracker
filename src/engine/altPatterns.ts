@@ -2,15 +2,18 @@
 // Each returns ChannelData ([instrumentIndex, pan, ...32 notes]) matching the
 // conventions of melody.ts / harmony.ts / bass.ts / drums.ts. 'AUTO' (null)
 // keeps the vibe-driven default generator.
-import { CH_ARP, CH_HAT, CH_KICK, CH_PAD, CH_SNARE, ChannelData, NoteName, ScaleName, VibeName } from './types';
+import {
+  CH_ARP, CH_HAT, CH_KICK, CH_PAD, CH_SNARE, ChannelData, NoteName, ScaleName, VibeName,
+  DEFAULT_PATTERN_LENGTH, DRUM_PERIOD, RHYTHM_PERIOD, rowsPerChord,
+} from './types';
 import { ChordProgression } from './chords';
 import { getScaleNotes } from './scales';
 import { euclidean } from './euclidean';
 import { VIBE_CONFIG } from './vibes';
 import { drumChannelFromHits, type DrumChannels } from './drums';
 
-const ROWS = 32;
-const ROWS_PER_CHORD = 8;
+const ROWS = DRUM_PERIOD;      // drum templates tile at this period
+const ROWS_PER_CHORD = RHYTHM_PERIOD; // melodic figures repeat at this period
 
 export type LeadAlgo = 'walk' | 'arp' | 'riff';
 export type HarmonyAlgo = 'gapfill' | 'stabs' | 'arp' | 'pedal';
@@ -30,16 +33,30 @@ function clampNote(n: number): number {
   return Math.max(1, Math.min(48, n));
 }
 
+
+/**
+ * Walk the pattern in RHYTHM_PERIOD blocks, handing back the chord in force at
+ * each block, so figures keep their 8-row period at any pattern length.
+ */
+function eachBlock(
+  progression: ChordProgression,
+  cb: (start: number, blockLength: number, chord: ChordProgression['chords'][number]) => void,
+): void {
+  const length = progression.chordAtRow.length;
+  for (let start = 0; start < length; start += ROWS_PER_CHORD) {
+    cb(start, Math.min(ROWS_PER_CHORD, length - start), progression.chordAtRow[start]);
+  }
+}
+
 // --- LEAD ------------------------------------------------------------------
 
 /** Chord arpeggios: cycles chord tones in a fixed direction per chord. */
 export function generateArpLead(progression: ChordProgression, density: number): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
   const direction = pick(['up', 'down', 'updown'] as const);
   const step = density > 0.55 ? 1 : 2; // 16ths when dense, 8ths otherwise
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
+  eachBlock(progression, (start, blockLength, c) => {
     const up = [c.rootMelody, c.thirdMelody, c.fifthMelody, clampNote(c.rootMelody + 12)];
     const tones =
       direction === 'up' ? up :
@@ -47,11 +64,11 @@ export function generateArpLead(progression: ChordProgression, density: number):
       [...up, c.fifthMelody, c.thirdMelody]; // updown
 
     let t = 0;
-    for (let i = 0; i < ROWS_PER_CHORD; i += step) {
-      notes[chordIdx * ROWS_PER_CHORD + i] = tones[t % tones.length];
+    for (let i = 0; i < blockLength; i += step) {
+      notes[start + i] = tones[t % tones.length];
       t++;
     }
-  }
+  });
 
   return [0, 0, ...notes];
 }
@@ -83,14 +100,14 @@ export function generateRiffLead(
     first = false;
   }
 
-  // Repeat the motif, shifted to each chord's root
-  const notes: number[] = Array(ROWS).fill(0);
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const delta = progression.chords[chordIdx].rootMelody - base.rootMelody;
-    for (let i = 0; i < ROWS_PER_CHORD; i++) {
-      if (motif[i] > 0) notes[chordIdx * ROWS_PER_CHORD + i] = clampNote(motif[i] + delta);
+  // Repeat the motif, shifted to whichever chord sits under each block
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
+  eachBlock(progression, (start, blockLength, chord) => {
+    const delta = chord.rootMelody - base.rootMelody;
+    for (let i = 0; i < blockLength; i++) {
+      if (motif[i] > 0) notes[start + i] = clampNote(motif[i] + delta);
     }
-  }
+  });
 
   return [0, 0, ...notes];
 }
@@ -99,48 +116,52 @@ export function generateRiffLead(
 
 /** Offbeat chord stabs (ska/house style). */
 export function generateStabsHarmony(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
   const positions = pick([[2, 6], [4], [2, 4, 6]]);
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
-    positions.forEach((posInSegment, i) => {
-      const tone = i % 2 === 0 ? c.thirdMelody : c.fifthMelody;
-      notes[chordIdx * ROWS_PER_CHORD + posInSegment] = tone;
+  eachBlock(progression, (start, blockLength, c) => {
+    positions.forEach((pos, i) => {
+      if (pos >= blockLength) return;
+      notes[start + pos] = i % 2 === 0 ? c.thirdMelody : c.fifthMelody;
     });
-  }
+  });
 
   return [1, 0, ...notes];
 }
 
 /** Continuous chord arpeggio (C64 style). */
 export function generateArpHarmony(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
   const cycle = pick([
     ['r', 't', 'f', 't'],
     ['r', 'f', 't', 'f'],
     ['r', 't', 'f', 'r'],
   ]);
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
-    for (let i = 0; i < ROWS_PER_CHORD; i += 2) {
+  eachBlock(progression, (start, blockLength, c) => {
+    for (let i = 0; i < blockLength; i += 2) {
       const tone = cycle[(i / 2) % cycle.length];
-      notes[chordIdx * ROWS_PER_CHORD + i] =
+      notes[start + i] =
         tone === 'r' ? c.rootMelody : tone === 't' ? c.thirdMelody : c.fifthMelody;
     }
-  }
+  });
 
   return [1, 0, ...notes];
 }
 
 /** Pedal tone: chord root held at each chord change. */
 export function generatePedalHarmony(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
-    notes[chordIdx * ROWS_PER_CHORD] = c.rootMelody;
-    if (Math.random() < 0.5) notes[chordIdx * ROWS_PER_CHORD + 4] = c.rootMelody;
+  // A pedal follows chord changes rather than the 8-row figure period.
+  const length = progression.chordAtRow.length;
+  const perChord = rowsPerChord(length);
+  const notes: number[] = Array(length).fill(0);
+  for (let seg = 0; seg < progression.chords.length; seg++) {
+    const start = seg * perChord;
+    if (start >= length) break;
+    const c = progression.chords[seg];
+    notes[start] = c.rootMelody;
+    const mid = start + Math.floor(perChord / 2);
+    if (mid < length && Math.random() < 0.5) notes[mid] = c.rootMelody;
   }
   return [1, 0, ...notes];
 }
@@ -149,61 +170,63 @@ export function generatePedalHarmony(progression: ChordProgression): ChannelData
 
 /** 16th-note acid line: mostly root with octave jumps and chord-tone spice. */
 export function generateAcidBass(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
-    for (let i = 0; i < ROWS_PER_CHORD; i++) {
+  eachBlock(progression, (start, blockLength, c) => {
+    for (let i = 0; i < blockLength; i++) {
       const strong = i % 2 === 0;
       if (Math.random() >= (strong ? 0.85 : 0.45)) continue;
       const r = Math.random();
-      const note =
+      notes[start + i] =
         r < 0.6 ? c.root :
         r < 0.8 ? clampNote(c.root + 12) :
         r < 0.92 ? c.fifth : c.third;
-      notes[chordIdx * ROWS_PER_CHORD + i] = note;
     }
-    // Always anchor the chord change on the root
-    notes[chordIdx * ROWS_PER_CHORD] = c.root;
-  }
+    notes[start] = c.root; // anchor every block on the root
+  });
 
   return [2, 0, ...notes];
 }
 
 /** Offbeat eighth bass (house pump): root between the kicks. */
 export function generateOffbeatBass(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
-  for (let beat = 0; beat < 4; beat++) {
-    const chord = progression.chordAtRow[beat * 8];
-    notes[beat * 8 + 4] = chord.root;
-    if (Math.random() < 0.3) notes[beat * 8 + 6] = chord.fifth;
-  }
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
+  eachBlock(progression, (start, blockLength, chord) => {
+    if (blockLength > 4) notes[start + 4] = chord.root;
+    if (blockLength > 6 && Math.random() < 0.3) notes[start + 6] = chord.fifth;
+  });
   return [2, 0, ...notes];
 }
 
 /** Root-fifth-octave bass arpeggio. */
 export function generateArpBass(progression: ChordProgression): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
+  eachBlock(progression, (start, blockLength, c) => {
     const cycle = [c.root, c.fifth, clampNote(c.root + 12), c.fifth];
-    for (let i = 0; i < ROWS_PER_CHORD; i += 2) {
-      notes[chordIdx * ROWS_PER_CHORD + i] = cycle[(i / 2) % cycle.length];
+    for (let i = 0; i < blockLength; i += 2) {
+      notes[start + i] = cycle[(i / 2) % cycle.length];
     }
-  }
+  });
   return [2, 0, ...notes];
 }
 
 // --- DRUMS ------------------------------------------------------------------
 
-function assembleDrums(kicks: Set<number>, snares: Set<number>, hats: Set<number>): DrumChannels {
-  const kickArray: number[] = Array(ROWS).fill(0);
-  for (const row of kicks) kickArray[row] = 1;
+function assembleDrums(
+  kicks: Set<number>,
+  snares: Set<number>,
+  hats: Set<number>,
+  length: number,
+): DrumChannels {
+  const kickArray: number[] = Array(length).fill(0);
+  for (let row = 0; row < length; row++) {
+    if (kicks.has(row % DRUM_PERIOD)) kickArray[row] = 1;
+  }
   return {
     channels: [
-      drumChannelFromHits(kicks, CH_KICK),
-      drumChannelFromHits(snares, CH_SNARE),
-      drumChannelFromHits(hats, CH_HAT),
+      drumChannelFromHits(kicks, CH_KICK, length),
+      drumChannelFromHits(snares, CH_SNARE, length),
+      drumChannelFromHits(hats, CH_HAT, length),
     ],
     kickPattern: kickArray,
   };
@@ -214,7 +237,7 @@ const EUCLID_KICK_PULSES: Record<string, number> = {
 };
 
 /** Fully euclidean kit: kick/snare/hat as rotated euclidean rhythms. */
-export function generateEuclidDrums(vibe: VibeName): DrumChannels {
+export function generateEuclidDrums(vibe: VibeName, length: number = DEFAULT_PATTERN_LENGTH): DrumChannels {
   const intensity = VIBE_CONFIG[vibe].drumIntensity;
   const kickPulses = EUCLID_KICK_PULSES[intensity] ?? 5;
 
@@ -230,7 +253,7 @@ export function generateEuclidDrums(vibe: VibeName): DrumChannels {
   const hats = new Set<number>();
   for (let i = 0; i < ROWS; i++) if (hatPattern[i]) hats.add(i);
 
-  return assembleDrums(kicks, snares, hats);
+  return assembleDrums(kicks, snares, hats, length);
 }
 
 // Classic break skeletons (amen-ish, funky-drummer-ish)
@@ -241,7 +264,7 @@ const BREAK_TEMPLATES: { kick: number[]; snare: number[]; hat: number[] }[] = [
 ];
 
 /** Breakbeat: a classic break skeleton with light ghost variation. */
-export function generateBreakDrums(): DrumChannels {
+export function generateBreakDrums(length: number = DEFAULT_PATTERN_LENGTH): DrumChannels {
   const t = pick(BREAK_TEMPLATES);
   const kicks = new Set(t.kick);
   const snares = new Set(t.snare);
@@ -249,11 +272,11 @@ export function generateBreakDrums(): DrumChannels {
   // Ghost hits keep loops from feeling static
   if (Math.random() < 0.4) snares.add(pick([14, 30, 18]));
   if (Math.random() < 0.3) kicks.add(pick([20, 26]));
-  return assembleDrums(kicks, snares, hats);
+  return assembleDrums(kicks, snares, hats, length);
 }
 
 /** Strict four-on-the-floor: kicks on the beat, claps on the backbeat. */
-export function generateFourDrums(): DrumChannels {
+export function generateFourDrums(length: number = DEFAULT_PATTERN_LENGTH): DrumChannels {
   const kicks = new Set([0, 8, 16, 24]);
   // With its own channel the clap can sit on the backbeat under the kick.
   const snares = new Set([8, 24]);
@@ -261,7 +284,7 @@ export function generateFourDrums(): DrumChannels {
   for (const h of [2, 6, 10, 14, 18, 22, 26, 30]) {
     if (Math.random() < 0.35) hats.add(h);
   }
-  return assembleDrums(kicks, snares, hats);
+  return assembleDrums(kicks, snares, hats, length);
 }
 
 // --- ARP --------------------------------------------------------------------
@@ -272,14 +295,13 @@ export function generateArpChannel(
   algo: string | null,
   role: string,
 ): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  const notes: number[] = Array(progression.chordAtRow.length).fill(0);
   if (role === 'breakdown') return [CH_ARP, 0, ...notes];
 
   const mode = algo ?? pick(['updown', 'octaves', 'random']);
   const step = role === 'climax' || role === 'chorus' ? 1 : 2;
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
+  eachBlock(progression, (start, blockLength, c) => {
     const base = [c.rootMelody, c.thirdMelody, c.fifthMelody];
     const tones =
       mode === 'octaves'
@@ -289,12 +311,11 @@ export function generateArpChannel(
           : [...base, clampNote(c.rootMelody + 12), c.fifthMelody, c.thirdMelody]; // updown
 
     let t = 0;
-    for (let i = 0; i < ROWS_PER_CHORD; i += step) {
-      const row = chordIdx * ROWS_PER_CHORD + i;
-      notes[row] = mode === 'random' ? pick(tones) : tones[t % tones.length];
+    for (let i = 0; i < blockLength; i += step) {
+      notes[start + i] = mode === 'random' ? pick(tones) : tones[t % tones.length];
       t++;
     }
-  }
+  });
 
   return [CH_ARP, 0, ...notes];
 }
@@ -308,21 +329,26 @@ export function generatePadChannel(
   algo: string | null,
   role: string,
 ): ChannelData {
-  const notes: number[] = Array(ROWS).fill(0);
+  // Pads move with chord changes, not the 8-row figure period.
+  const length = progression.chordAtRow.length;
+  const perChord = rowsPerChord(length);
+  const notes: number[] = Array(length).fill(0);
   const mode = algo ?? 'sustain';
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const c = progression.chords[chordIdx];
-    const start = chordIdx * ROWS_PER_CHORD;
+  for (let seg = 0; seg < progression.chords.length; seg++) {
+    const start = seg * perChord;
+    if (start >= length) break;
+    const c = progression.chords[seg];
+    const mid = start + Math.floor(perChord / 2);
 
     if (mode === 'stab') {
       notes[start] = c.thirdMelody;
     } else if (mode === 'swell') {
       // Enter late in the segment so the pad rises into the next chord
-      notes[start + 4] = c.rootMelody;
+      if (mid < length) notes[mid] = c.rootMelody;
     } else {
       notes[start] = c.rootMelody;
-      if (role === 'climax' || role === 'chorus') notes[start + 4] = c.fifthMelody;
+      if ((role === 'climax' || role === 'chorus') && mid < length) notes[mid] = c.fifthMelody;
     }
   }
 
