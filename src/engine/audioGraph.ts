@@ -1,4 +1,5 @@
 import { ZZFX } from 'zzfx';
+import { CHANNEL_COUNT } from './types';
 
 type SampleArray = number[] | Float32Array;
 type StereoPair = [SampleArray, SampleArray];
@@ -26,10 +27,10 @@ export class AudioGraph {
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
 
-    // Create 4 persistent gain nodes
+    // One persistent gain node per channel
     this.gainNodes = [];
     this.sources = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < CHANNEL_COUNT; i++) {
       const gain = this.ctx.createGain();
       gain.connect(this.masterGain);
       this.gainNodes.push(gain);
@@ -68,7 +69,7 @@ export class AudioGraph {
     this.playStartTime = this.ctx.currentTime;
     this._isPlaying = true;
 
-    const numChannels = Math.min(channelBuffers.length, 4);
+    const numChannels = Math.min(channelBuffers.length, CHANNEL_COUNT);
     for (let ch = 0; ch < numChannels; ch++) {
       this.createAndStartSource(ch, channelBuffers[ch], 0);
     }
@@ -109,7 +110,7 @@ export class AudioGraph {
     const newOffset = (oldRowIndex * newRowDuration) % songDurationSec;
 
     // Stop all old sources at swap time, start new ones
-    const numChannels = Math.min(channelBuffers.length, 4);
+    const numChannels = Math.min(channelBuffers.length, CHANNEL_COUNT);
     for (let ch = 0; ch < numChannels; ch++) {
       const oldSource = this.sources[ch];
       if (oldSource) {
@@ -126,7 +127,7 @@ export class AudioGraph {
   }
 
   replaceChannel(ch: number, stereoBuffer: StereoPair): void {
-    if (!this._isPlaying || ch < 0 || ch >= 4) return;
+    if (!this._isPlaying || ch < 0 || ch >= CHANNEL_COUNT) return;
 
     const now = this.ctx.currentTime;
     const elapsed = (now - this.playStartTime) % this.songDuration;

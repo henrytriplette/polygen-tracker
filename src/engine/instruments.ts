@@ -1,4 +1,4 @@
-import { VibeName, ZzFXSound } from './types';
+import { CHANNELS, CHANNEL_COUNT, CH_HAT, CH_KICK, CH_SNARE, VibeName, ZzFXSound } from './types';
 
 // ZzFX params: [volume, randomness, frequency, attack, sustain, release, shape,
 //   shapeCurve, slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime,
@@ -626,14 +626,32 @@ function buildInstrument(
   return params;
 }
 
-const CHANNEL_ROLES: ChannelRole[] = ['lead', 'harmony', 'bass', 'drums'];
-
 const ROLE_ARCHETYPES: Record<ChannelRole, Archetype[]> = {
   lead: LEAD_ARCHETYPES,
   harmony: HARMONY_ARCHETYPES,
   bass: BASS_ARCHETYPES,
   drums: DRUM_ARCHETYPES,
 };
+
+// The three drum channels share the drum archetypes but are voiced apart:
+// a low boomy kick, a mid snare crack, a short bright hat.
+const DRUM_VOICING: Record<number, { freq: number; sustain: number; release: number; noise: number }> = {
+  [CH_KICK]: { freq: 0.42, sustain: 1.5, release: 1.4, noise: 0.55 },
+  [CH_SNARE]: { freq: 1.15, sustain: 1.0, release: 1.0, noise: 1.5 },
+  [CH_HAT]: { freq: 2.6, sustain: 0.35, release: 0.45, noise: 2.2 },
+};
+
+function voiceDrum(params: ZzFXSound, channelIndex: number): ZzFXSound {
+  const v = DRUM_VOICING[channelIndex];
+  if (!v) return params;
+  const p = [...params];
+  p[2] = (p[2] ?? 350) * v.freq;                          // frequency
+  p[4] = (p[4] ?? 0.01) * v.sustain;                      // sustain
+  p[5] = (p[5] ?? 0.08) * v.release;                      // release
+  p[13] = Math.min(2.5, (p[13] ?? 0.5) * v.noise);        // noise
+  if (channelIndex === CH_HAT) p[8] = 0;                  // hats don't sweep
+  return p;
+}
 
 // Build one channel's instrument from a specific vibe — used when a channel
 // has its own vibe override. An optional `sound` forces a named archetype
@@ -643,20 +661,20 @@ export function generateInstrumentForChannel(
   channelIndex: number,
   sound?: string | null,
 ): ZzFXSound {
-  const role = CHANNEL_ROLES[channelIndex] ?? 'lead';
-  return buildInstrument(ROLE_ARCHETYPES[role], VIBE_TRAITS[vibe][role], sound);
+  const family = CHANNELS[channelIndex]?.family ?? 'lead';
+  const params = buildInstrument(ROLE_ARCHETYPES[family], VIBE_TRAITS[vibe][family], sound);
+  return family === 'drums' ? voiceDrum(params, channelIndex) : params;
 }
 
 export function generateInstruments(vibe: VibeName): ZzFXSound[] {
-  return CHANNEL_ROLES.map((_, ch) => generateInstrumentForChannel(vibe, ch));
+  return Array.from({ length: CHANNEL_COUNT }, (_, ch) => generateInstrumentForChannel(vibe, ch));
 }
 
-// Selectable timbre palette per channel — the named archetypes for each role.
-// Index matches the channel order [lead, harmony, bass, drums]; a null choice
-// (AUTO) falls back to the vibe-weighted pick.
+// Selectable timbre palette per channel — the named archetypes for its family.
+// A null choice (AUTO) falls back to the vibe-weighted pick.
 export const CHANNEL_SOUND_OPTIONS: { value: string; label: string }[][] =
-  CHANNEL_ROLES.map((role) =>
-    ROLE_ARCHETYPES[role].map((a) => ({
+  CHANNELS.map((channel) =>
+    ROLE_ARCHETYPES[channel.family].map((a) => ({
       value: a.name,
       label: a.name.replace(/-/g, ' ').toUpperCase(),
     }))

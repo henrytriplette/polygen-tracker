@@ -6,11 +6,23 @@ import {
   Pattern,
   PatternLabel,
   PatternEffects,
+  ChannelData,
   ChannelEffects,
   ChannelVibes,
   ChannelSounds,
   NoteEffect,
   VibeName,
+  CHANNEL_COUNT,
+  CH_LEAD,
+  CH_HARMONY,
+  CH_BASS,
+  CH_KICK,
+  CH_SNARE,
+  CH_HAT,
+  CH_ARP,
+  CH_PAD,
+  isDrumChannel,
+  channelFamily,
 } from './types';
 import { VIBE_CONFIG, getRandomBpm } from './vibes';
 import { generateInstruments, generateInstrumentForChannel } from './instruments';
@@ -23,16 +35,19 @@ import {
   ChannelAlgos,
   generateAcidBass,
   generateArpBass,
+  generateArpChannel,
   generateArpHarmony,
   generateArpLead,
   generateBreakDrums,
   generateEuclidDrums,
   generateFourDrums,
   generateOffbeatBass,
+  generatePadChannel,
   generatePedalHarmony,
   generateRiffLead,
   generateStabsHarmony,
 } from './altPatterns';
+import type { DrumChannels } from './drums';
 import { generatePatternEffects, generateChannelEffects, applyEffect } from './effects';
 import { generateSongName } from './songNames';
 import { findStructure } from './structures';
@@ -72,11 +87,11 @@ function vibeAt(config: SongConfig, channelVibes: ChannelVibes | undefined, ch: 
 // Each channel can override its pattern algorithm; null keeps the vibe default.
 
 function makeLead(
-  algo: ChannelAlgos[0],
+  algo: string | null,
   config: SongConfig,
   density: number,
   progression: ChordProgression,
-): Pattern[0] {
+): ChannelData {
   switch (algo) {
     case 'arp': return generateArpLead(progression, density);
     case 'riff': return generateRiffLead(config.key, config.scale, progression);
@@ -85,11 +100,11 @@ function makeLead(
 }
 
 function makeHarmony(
-  algo: ChannelAlgos[1],
+  algo: string | null,
   config: SongConfig,
   melodyNotes: number[],
   progression: ChordProgression,
-): Pattern[1] {
+): ChannelData {
   switch (algo) {
     case 'stabs': return generateStabsHarmony(progression);
     case 'arp': return generateArpHarmony(progression);
@@ -99,13 +114,13 @@ function makeHarmony(
 }
 
 function makeBass(
-  algo: ChannelAlgos[2],
+  algo: string | null,
   config: SongConfig,
   kickPattern: number[],
   density: [number, number],
   vibe: VibeName,
   progression: ChordProgression,
-): Pattern[2] {
+): ChannelData {
   switch (algo) {
     case 'acid': return generateAcidBass(progression);
     case 'offbeat': return generateOffbeatBass(progression);
@@ -114,16 +129,26 @@ function makeBass(
   }
 }
 
-function makeDrums(
-  algo: ChannelAlgos[3],
-  vibe: VibeName,
-): { channelData: Pattern[3]; kickPattern: number[] } {
+function makeDrums(algo: string | null, vibe: VibeName): DrumChannels {
   switch (algo) {
     case 'euclid': return generateEuclidDrums(vibe);
     case 'break': return generateBreakDrums();
     case 'four': return generateFourDrums();
     default: return generateDrumPattern(vibe);
   }
+}
+
+function silentChannel(ch: number): ChannelData {
+  return [ch, 0, ...Array(ROWS).fill(0)];
+}
+
+/** A null-filled per-channel settings array (vibes / algos / sounds). */
+function emptyChannelArray(): null[] {
+  return Array(CHANNEL_COUNT).fill(null);
+}
+
+function allChannelIndices(): number[] {
+  return Array.from({ length: CHANNEL_COUNT }, (_, i) => i);
 }
 
 function generatePatternForRole(
@@ -133,10 +158,10 @@ function generatePatternForRole(
   fixedDegrees?: number[],
   channelAlgos?: ChannelAlgos,
 ): { pattern: Pattern; effects: PatternEffects; degrees: number[] } {
-  const melodyVibe = vibeAt(config, channelVibes, 0);
-  const harmonyVibe = vibeAt(config, channelVibes, 1);
-  const bassVibe = vibeAt(config, channelVibes, 2);
-  const drumVibe = vibeAt(config, channelVibes, 3);
+  const melodyVibe = vibeAt(config, channelVibes, CH_LEAD);
+  const harmonyVibe = vibeAt(config, channelVibes, CH_HARMONY);
+  const bassVibe = vibeAt(config, channelVibes, CH_BASS);
+  const drumVibe = vibeAt(config, channelVibes, CH_KICK);
 
   // Chord progression flavor follows the harmony channel's vibe — the key and
   // scale stay global, so every channel remains harmonically locked.
@@ -144,8 +169,9 @@ function generatePatternForRole(
   const degrees = fixedDegrees ?? randomProgressionDegrees(harmonyVibe);
   const progression = progressionFromDegrees(degrees, config.key, config.scale);
 
-  // Drums always play (backbone of every section)
-  const { channelData: drumChannel, kickPattern } = makeDrums(channelAlgos?.[3] ?? null, drumVibe);
+  // Drums always play (backbone of every section) — kick/snare/hat channels
+  const drums = makeDrums(channelAlgos?.[CH_KICK] ?? null, drumVibe);
+  const kickPattern = drums.kickPattern;
 
   // Apply role-based density scaling, per-channel vibe densities
   const melodyDensity = Math.min(1, VIBE_CONFIG[melodyVibe].melodyDensity * ROLE_MELODY_MULTIPLIER[role]);
@@ -156,42 +182,41 @@ function generatePatternForRole(
     Math.round(bassDensity[1] * bassDensityScale),
   ];
 
-  // Breakdown: silent lead + harmony
-  if (role === 'breakdown') {
-    const silentChannel = [0, 0, ...Array(ROWS).fill(0)];
-    const bassChannel = makeBass(
-      channelAlgos?.[2] ?? null, config, kickPattern,
-      scaledBassDensity, bassVibe, progression
-    );
-    const pattern = [silentChannel, silentChannel, bassChannel, drumChannel] as Pattern;
-    const effects = generatePatternEffects(pattern, config, role, channelVibes);
-    return { pattern, effects, degrees };
-  }
-
-  // Melody
-  const melodyChannel = makeLead(channelAlgos?.[0] ?? null, config, melodyDensity, progression);
-
-  // Bass
   const bassChannel = makeBass(
-    channelAlgos?.[2] ?? null, config, kickPattern,
+    channelAlgos?.[CH_BASS] ?? null, config, kickPattern,
     scaledBassDensity, bassVibe, progression
   );
 
-  // Harmony
-  const melodyNotes = melodyChannel.slice(2);
-  const harmonyChannel = makeHarmony(channelAlgos?.[1] ?? null, config, melodyNotes, progression);
+  const pattern: Pattern = Array.from({ length: CHANNEL_COUNT }, (_, ch) => silentChannel(ch));
+  pattern[CH_BASS] = bassChannel;
+  pattern[CH_KICK] = drums.channels[0];
+  pattern[CH_SNARE] = drums.channels[1];
+  pattern[CH_HAT] = drums.channels[2];
 
-  // Bridge/refrain: thin out harmony (50% chance to silence each hit) —
-  // bridges for breathing room, refrains so the hook line stays in front
-  if (role === 'bridge' || role === 'refrain') {
-    for (let i = 2; i < harmonyChannel.length; i++) {
-      if (harmonyChannel[i] > 0 && Math.random() < 0.5) {
-        harmonyChannel[i] = 0;
+  // Breakdown: lead, harmony and arp drop out; bass + drums carry it
+  if (role !== 'breakdown') {
+    const melodyChannel = makeLead(channelAlgos?.[CH_LEAD] ?? null, config, melodyDensity, progression);
+    const melodyNotes = melodyChannel.slice(2);
+    const harmonyChannel = makeHarmony(channelAlgos?.[CH_HARMONY] ?? null, config, melodyNotes, progression);
+
+    // Bridge/refrain: thin out harmony (50% chance to silence each hit) —
+    // bridges for breathing room, refrains so the hook line stays in front
+    if (role === 'bridge' || role === 'refrain') {
+      for (let i = 2; i < harmonyChannel.length; i++) {
+        if (harmonyChannel[i] > 0 && Math.random() < 0.5) {
+          harmonyChannel[i] = 0;
+        }
       }
     }
+
+    pattern[CH_LEAD] = melodyChannel;
+    pattern[CH_HARMONY] = harmonyChannel;
+    pattern[CH_ARP] = generateArpChannel(progression, channelAlgos?.[CH_ARP] ?? null, role);
   }
 
-  const pattern = [melodyChannel, harmonyChannel, bassChannel, drumChannel] as Pattern;
+  // Pads hold through breakdowns — they're the bed everything else sits on
+  pattern[CH_PAD] = generatePadChannel(progression, channelAlgos?.[CH_PAD] ?? null, role);
+
   const effects = generatePatternEffects(pattern, config, role, channelVibes);
   return { pattern, effects, degrees };
 }
@@ -228,10 +253,10 @@ export function generateSong(
     length,
   };
 
-  const vibes: ChannelVibes = channelVibes ?? [null, null, null, null];
-  const algos: ChannelAlgos = channelAlgos ?? [null, null, null, null];
-  const sounds: ChannelSounds = channelSounds ?? [null, null, null, null];
-  const instruments = [0, 1, 2, 3].map((ch) =>
+  const vibes: ChannelVibes = channelVibes ?? emptyChannelArray();
+  const algos: ChannelAlgos = channelAlgos ?? emptyChannelArray();
+  const sounds: ChannelSounds = channelSounds ?? emptyChannelArray();
+  const instruments = Array.from({ length: CHANNEL_COUNT }, (_, ch) =>
     generateInstrumentForChannel(vibes[ch] ?? vibe, ch, sounds[ch])
   );
 
@@ -463,9 +488,10 @@ export function regenerateChannel(
 ): { pattern: Pattern; effects: PatternEffects } {
   const pattern = [...song.patterns[patternLabel]] as Pattern;
   let role = song.patternRoles[patternLabel] ?? 'verse';
-  // "Populate" mode: an explicit request for lead/harmony in a breakdown
-  // pattern should produce notes, not respect the role's silence.
-  if (options.forceAudible && role === 'breakdown' && channelIndex < 2) {
+  // "Populate" mode: an explicit request for a channel the role silences
+  // (lead/harmony/arp in a breakdown) should produce notes anyway.
+  const silencedByRole = channelIndex === CH_LEAD || channelIndex === CH_HARMONY || channelIndex === CH_ARP;
+  if (options.forceAudible && role === 'breakdown' && silencedByRole) {
     role = 'verse';
   }
   const channelVibe = vibeAt(song.config, song.channelVibes, channelIndex);
@@ -474,7 +500,7 @@ export function regenerateChannel(
   // Reuse the pattern's stored progression so the regenerated channel stays
   // harmonically aligned with the others; fall back to a fresh one.
   const degrees = song.patternChords?.[patternLabel]
-    ?? randomProgressionDegrees(vibeAt(song.config, song.channelVibes, 1));
+    ?? randomProgressionDegrees(vibeAt(song.config, song.channelVibes, CH_HARMONY));
   const progression = progressionFromDegrees(degrees, song.config.key, song.config.scale);
 
   const melodyMult = ROLE_MELODY_MULTIPLIER[role];
@@ -483,31 +509,26 @@ export function regenerateChannel(
   const algos = song.channelAlgos;
 
   switch (channelIndex) {
-    case 0: {
-      if (role === 'breakdown') {
-        pattern[0] = [0, 0, ...Array(ROWS).fill(0)];
-      } else {
-        pattern[0] = makeLead(
-          algos?.[0] ?? null, song.config,
-          Math.min(1, channelVibeConfig.melodyDensity * melodyMult),
-          progression
-        );
-      }
+    case CH_LEAD: {
+      pattern[CH_LEAD] = role === 'breakdown'
+        ? silentChannel(CH_LEAD)
+        : makeLead(
+            algos?.[CH_LEAD] ?? null, song.config,
+            Math.min(1, channelVibeConfig.melodyDensity * melodyMult),
+            progression
+          );
       break;
     }
-    case 1: {
-      if (role === 'breakdown') {
-        pattern[1] = [0, 0, ...Array(ROWS).fill(0)];
-      } else {
-        const melodyNotes = pattern[0].slice(2);
-        pattern[1] = makeHarmony(algos?.[1] ?? null, song.config, melodyNotes, progression);
-      }
+    case CH_HARMONY: {
+      pattern[CH_HARMONY] = role === 'breakdown'
+        ? silentChannel(CH_HARMONY)
+        : makeHarmony(algos?.[CH_HARMONY] ?? null, song.config, pattern[CH_LEAD].slice(2), progression);
       break;
     }
-    case 2: {
-      const kickPattern = pattern[3].slice(2).map(n => n > 0 ? 1 : 0);
-      pattern[2] = makeBass(
-        algos?.[2] ?? null, song.config, kickPattern,
+    case CH_BASS: {
+      const kickPattern = pattern[CH_KICK].slice(2).map(n => n > 0 ? 1 : 0);
+      pattern[CH_BASS] = makeBass(
+        algos?.[CH_BASS] ?? null, song.config, kickPattern,
         [
           Math.round(channelVibeConfig.bassDensity[0] * bassMult),
           Math.round(channelVibeConfig.bassDensity[1] * bassMult),
@@ -516,21 +537,35 @@ export function regenerateChannel(
       );
       break;
     }
-    case 3: {
-      const { channelData } = makeDrums(algos?.[3] ?? null, channelVibe);
-      pattern[3] = channelData;
+    // Regenerating any drum channel re-rolls the whole kit, so the parts
+    // stay rhythmically coherent with each other.
+    case CH_KICK:
+    case CH_SNARE:
+    case CH_HAT: {
+      const drums = makeDrums(algos?.[channelIndex] ?? null, channelVibe);
+      pattern[CH_KICK] = drums.channels[0];
+      pattern[CH_SNARE] = drums.channels[1];
+      pattern[CH_HAT] = drums.channels[2];
+      break;
+    }
+    case CH_ARP: {
+      pattern[CH_ARP] = role === 'breakdown'
+        ? silentChannel(CH_ARP)
+        : generateArpChannel(progression, algos?.[CH_ARP] ?? null, role);
+      break;
+    }
+    case CH_PAD: {
+      pattern[CH_PAD] = generatePadChannel(progression, algos?.[CH_PAD] ?? null, role);
       break;
     }
   }
 
   // Preserve effects for unchanged channels, regenerate for the changed one
   const existingEffects = song.patternEffects?.[patternLabel];
-  const effects: PatternEffects = [
-    existingEffects?.[0] ?? Array(ROWS).fill(null),
-    existingEffects?.[1] ?? Array(ROWS).fill(null),
-    existingEffects?.[2] ?? Array(ROWS).fill(null),
-    existingEffects?.[3] ?? Array(ROWS).fill(null),
-  ];
+  const effects: PatternEffects = Array.from(
+    { length: CHANNEL_COUNT },
+    (_, ch) => existingEffects?.[ch] ?? Array(ROWS).fill(null)
+  );
   effects[channelIndex] = generateChannelEffects(
     channelIndex, pattern[channelIndex].slice(2), song.config, role, channelVibe
   );
@@ -552,32 +587,38 @@ export function applyChordsToPattern(
   const progression = progressionFromDegrees(degrees, song.config.key, song.config.scale);
   const pattern = [...song.patterns[patternLabel]] as Pattern;
 
-  const bassVibe = vibeAt(song.config, song.channelVibes, 2);
+  const bassVibe = vibeAt(song.config, song.channelVibes, CH_BASS);
   const bassMult = ROLE_BASS_MULTIPLIER[role];
   const bassDensity = VIBE_CONFIG[bassVibe].bassDensity;
-  const kickPattern = pattern[3].slice(2).map(n => (n > 0 ? 1 : 0));
+  const kickPattern = pattern[CH_KICK].slice(2).map(n => (n > 0 ? 1 : 0));
 
-  pattern[2] = makeBass(
-    song.channelAlgos?.[2] ?? null, song.config, kickPattern,
+  // Every pitched non-lead channel follows the chords; lead stays untouched.
+  pattern[CH_BASS] = makeBass(
+    song.channelAlgos?.[CH_BASS] ?? null, song.config, kickPattern,
     [Math.round(bassDensity[0] * bassMult), Math.round(bassDensity[1] * bassMult)],
     bassVibe, progression
   );
 
   if (role === 'breakdown') {
-    pattern[1] = [0, 0, ...Array(ROWS).fill(0)];
+    pattern[CH_HARMONY] = silentChannel(CH_HARMONY);
+    pattern[CH_ARP] = silentChannel(CH_ARP);
   } else {
-    pattern[1] = makeHarmony(
-      song.channelAlgos?.[1] ?? null, song.config, pattern[0].slice(2), progression
+    pattern[CH_HARMONY] = makeHarmony(
+      song.channelAlgos?.[CH_HARMONY] ?? null, song.config, pattern[CH_LEAD].slice(2), progression
     );
+    pattern[CH_ARP] = generateArpChannel(progression, song.channelAlgos?.[CH_ARP] ?? null, role);
   }
+  pattern[CH_PAD] = generatePadChannel(progression, song.channelAlgos?.[CH_PAD] ?? null, role);
 
   const existingEffects = song.patternEffects?.[patternLabel];
-  const effects: PatternEffects = [
-    existingEffects?.[0] ?? Array(ROWS).fill(null),
-    generateChannelEffects(1, pattern[1].slice(2), song.config, role, vibeAt(song.config, song.channelVibes, 1)),
-    generateChannelEffects(2, pattern[2].slice(2), song.config, role, bassVibe),
-    existingEffects?.[3] ?? Array(ROWS).fill(null),
-  ];
+  const regenerated = new Set([CH_HARMONY, CH_BASS, CH_ARP, CH_PAD]);
+  const effects: PatternEffects = Array.from({ length: CHANNEL_COUNT }, (_, ch) =>
+    regenerated.has(ch)
+      ? generateChannelEffects(
+          ch, pattern[ch].slice(2), song.config, role, vibeAt(song.config, song.channelVibes, ch)
+        )
+      : existingEffects?.[ch] ?? Array(ROWS).fill(null)
+  );
 
   return {
     ...song,
@@ -596,7 +637,7 @@ export function applyChannelAlgo(
   channelIndex: number,
   algo: ChannelAlgos[number],
 ): Song {
-  const channelAlgos = [...(song.channelAlgos ?? [null, null, null, null])] as ChannelAlgos;
+  const channelAlgos = [...(song.channelAlgos ?? emptyChannelArray())] as ChannelAlgos;
   channelAlgos[channelIndex] = algo as never;
 
   let next: Song = { ...song, channelAlgos };
@@ -617,7 +658,7 @@ export function applyChannelAlgo(
  * immediately audible; the other channels are untouched.
  */
 export function applyChannelVibe(song: Song, channelIndex: number, vibe: VibeName | null): Song {
-  const channelVibes = [...(song.channelVibes ?? [null, null, null, null])] as ChannelVibes;
+  const channelVibes = [...(song.channelVibes ?? emptyChannelArray())] as ChannelVibes;
   channelVibes[channelIndex] = vibe;
 
   const instruments = song.instruments.map(i => [...i]);
@@ -645,7 +686,7 @@ export function applyChannelVibe(song: Song, channelIndex: number, vibe: VibeNam
  * untouched \u2014 a different sound plays the same part.
  */
 export function applyChannelSound(song: Song, channelIndex: number, sound: string | null): Song {
-  const channelSounds = [...(song.channelSounds ?? [null, null, null, null])] as ChannelSounds;
+  const channelSounds = [...(song.channelSounds ?? emptyChannelArray())] as ChannelSounds;
   channelSounds[channelIndex] = sound;
 
   const vibe = song.channelVibes?.[channelIndex] ?? song.config.vibe;
@@ -683,7 +724,7 @@ function expandSong(song: Song): ExpandedSong {
       patterns: patternArrays,
       sequence: song.sequence,
       bpm: song.config.bpm,
-      channelMap: [0, 1, 2, 3],
+      channelMap: allChannelIndices(),
     };
   }
 
@@ -694,7 +735,7 @@ function expandSong(song: Song): ExpandedSong {
   for (const label of song.patternOrder) {
     const effects = song.patternEffects[label];
     if (!effects) continue;
-    for (let ch = 0; ch < 4; ch++) {
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
       if (!effects[ch]) continue;
       for (const fx of effects[ch]) {
         if (!fx) continue;
@@ -717,7 +758,7 @@ function expandSong(song: Song): ExpandedSong {
       patterns: patternArrays,
       sequence: song.sequence,
       bpm: song.config.bpm,
-      channelMap: [0, 1, 2, 3],
+      channelMap: allChannelIndices(),
     };
   }
 
@@ -732,7 +773,7 @@ function expandSong(song: Song): ExpandedSong {
   }
 
   // Build physical channel layout: 0-3 = clean, 4+ = effect channels
-  const channelMap: number[] = [0, 1, 2, 3];
+  const channelMap: number[] = allChannelIndices();
   const effectPhysMap = new Map<string, number>();
 
   for (const [key, { logicalCh }] of effectKeys) {
@@ -754,14 +795,14 @@ function expandSong(song: Song): ExpandedSong {
     for (let p = 0; p < physicalChannelCount; p++) {
       const logCh = channelMap[p];
       physPattern.push([
-        p < 4 ? pattern[logCh][0] : 0,
+        p < CHANNEL_COUNT ? pattern[logCh][0] : 0,
         pattern[logCh][1],
         ...Array(ROWS).fill(0),
       ]);
     }
 
     // Route notes to clean or effect channels
-    for (let ch = 0; ch < 4; ch++) {
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
       const channelData = pattern[ch];
       const channelEffects = effects?.[ch];
 
@@ -804,13 +845,13 @@ function mixToLogical(
 
   const sampleLength = physicalBuffers[0][0].length;
   const logical: [number[], number[]][] = [];
-  for (let ch = 0; ch < 4; ch++) {
+  for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
     logical.push([new Array(sampleLength).fill(0), new Array(sampleLength).fill(0)]);
   }
 
   for (let p = 0; p < physicalBuffers.length; p++) {
     const logCh = channelMap[p];
-    if (logCh === undefined || logCh < 0 || logCh > 3) continue;
+    if (logCh === undefined || logCh < 0 || logCh >= CHANNEL_COUNT) continue;
     const [pLeft, pRight] = physicalBuffers[p];
     const [lLeft, lRight] = logical[logCh];
     for (let i = 0; i < sampleLength; i++) {

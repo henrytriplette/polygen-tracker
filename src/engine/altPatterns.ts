@@ -2,11 +2,12 @@
 // Each returns ChannelData ([instrumentIndex, pan, ...32 notes]) matching the
 // conventions of melody.ts / harmony.ts / bass.ts / drums.ts. 'AUTO' (null)
 // keeps the vibe-driven default generator.
-import { ChannelData, DRUM_NOTES, NoteName, ScaleName, VibeName } from './types';
+import { CH_ARP, CH_HAT, CH_KICK, CH_PAD, CH_SNARE, ChannelData, NoteName, ScaleName, VibeName } from './types';
 import { ChordProgression } from './chords';
 import { getScaleNotes } from './scales';
 import { euclidean } from './euclidean';
 import { VIBE_CONFIG } from './vibes';
+import { drumChannelFromHits, type DrumChannels } from './drums';
 
 const ROWS = 32;
 const ROWS_PER_CHORD = 8;
@@ -15,9 +16,11 @@ export type LeadAlgo = 'walk' | 'arp' | 'riff';
 export type HarmonyAlgo = 'gapfill' | 'stabs' | 'arp' | 'pedal';
 export type BassAlgo = 'groove' | 'acid' | 'arp' | 'offbeat';
 export type DrumAlgo = 'template' | 'euclid' | 'break' | 'four';
+export type ArpAlgo = 'updown' | 'octaves' | 'random';
+export type PadAlgo = 'sustain' | 'swell' | 'stab';
 
-/** Per-channel algorithm override: null = vibe-driven default. */
-export type ChannelAlgos = [LeadAlgo | null, HarmonyAlgo | null, BassAlgo | null, DrumAlgo | null];
+/** Per-channel algorithm override (one entry per channel): null = vibe default. */
+export type ChannelAlgos = (string | null)[];
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -193,25 +196,17 @@ export function generateArpBass(progression: ChordProgression): ChannelData {
 
 // --- DRUMS ------------------------------------------------------------------
 
-interface DrumResult {
-  channelData: ChannelData;
-  kickPattern: number[];
-}
-
-function assembleDrums(kicks: Set<number>, snares: Set<number>, hats: Set<number>): DrumResult {
-  const notes: number[] = Array(ROWS).fill(0);
+function assembleDrums(kicks: Set<number>, snares: Set<number>, hats: Set<number>): DrumChannels {
   const kickArray: number[] = Array(ROWS).fill(0);
-  for (let i = 0; i < ROWS; i++) {
-    if (kicks.has(i)) {
-      notes[i] = DRUM_NOTES.KICK;
-      kickArray[i] = 1;
-    } else if (snares.has(i)) {
-      notes[i] = DRUM_NOTES.SNARE;
-    } else if (hats.has(i)) {
-      notes[i] = DRUM_NOTES.HAT;
-    }
-  }
-  return { channelData: [3, 0, ...notes], kickPattern: kickArray };
+  for (const row of kicks) kickArray[row] = 1;
+  return {
+    channels: [
+      drumChannelFromHits(kicks, CH_KICK),
+      drumChannelFromHits(snares, CH_SNARE),
+      drumChannelFromHits(hats, CH_HAT),
+    ],
+    kickPattern: kickArray,
+  };
 }
 
 const EUCLID_KICK_PULSES: Record<string, number> = {
@@ -219,7 +214,7 @@ const EUCLID_KICK_PULSES: Record<string, number> = {
 };
 
 /** Fully euclidean kit: kick/snare/hat as rotated euclidean rhythms. */
-export function generateEuclidDrums(vibe: VibeName): DrumResult {
+export function generateEuclidDrums(vibe: VibeName): DrumChannels {
   const intensity = VIBE_CONFIG[vibe].drumIntensity;
   const kickPulses = EUCLID_KICK_PULSES[intensity] ?? 5;
 
@@ -229,11 +224,11 @@ export function generateEuclidDrums(vibe: VibeName): DrumResult {
 
   const snarePattern = euclidean(2 + Math.floor(Math.random() * 3), ROWS, 4 + Math.floor(Math.random() * 8));
   const snares = new Set<number>();
-  for (let i = 0; i < ROWS; i++) if (snarePattern[i] && !kicks.has(i)) snares.add(i);
+  for (let i = 0; i < ROWS; i++) if (snarePattern[i]) snares.add(i);
 
   const hatPattern = euclidean(9 + Math.floor(Math.random() * 5), ROWS, Math.floor(Math.random() * 4));
   const hats = new Set<number>();
-  for (let i = 0; i < ROWS; i++) if (hatPattern[i] && !kicks.has(i) && !snares.has(i)) hats.add(i);
+  for (let i = 0; i < ROWS; i++) if (hatPattern[i]) hats.add(i);
 
   return assembleDrums(kicks, snares, hats);
 }
@@ -246,7 +241,7 @@ const BREAK_TEMPLATES: { kick: number[]; snare: number[]; hat: number[] }[] = [
 ];
 
 /** Breakbeat: a classic break skeleton with light ghost variation. */
-export function generateBreakDrums(): DrumResult {
+export function generateBreakDrums(): DrumChannels {
   const t = pick(BREAK_TEMPLATES);
   const kicks = new Set(t.kick);
   const snares = new Set(t.snare);
@@ -257,15 +252,79 @@ export function generateBreakDrums(): DrumResult {
   return assembleDrums(kicks, snares, hats);
 }
 
-/** Strict four-on-the-floor with skipped claps and offbeat hats. */
-export function generateFourDrums(): DrumResult {
+/** Strict four-on-the-floor: kicks on the beat, claps on the backbeat. */
+export function generateFourDrums(): DrumChannels {
   const kicks = new Set([0, 8, 16, 24]);
-  // The kick owns the beat rows on this single drum channel, so claps go on
-  // the skipped offbeat (rows 12/28) — a classic house move.
-  const snares = new Set([12, 28]);
-  const hats = new Set([4, 20]);
+  // With its own channel the clap can sit on the backbeat under the kick.
+  const snares = new Set([8, 24]);
+  const hats = new Set([4, 12, 20, 28]); // offbeat pump
   for (const h of [2, 6, 10, 14, 18, 22, 26, 30]) {
-    if (Math.random() < 0.5) hats.add(h);
+    if (Math.random() < 0.35) hats.add(h);
   }
   return assembleDrums(kicks, snares, hats);
+}
+
+// --- ARP --------------------------------------------------------------------
+// A dedicated arpeggio channel, one octave above the harmony.
+
+export function generateArpChannel(
+  progression: ChordProgression,
+  algo: string | null,
+  role: string,
+): ChannelData {
+  const notes: number[] = Array(ROWS).fill(0);
+  if (role === 'breakdown') return [CH_ARP, 0, ...notes];
+
+  const mode = algo ?? pick(['updown', 'octaves', 'random']);
+  const step = role === 'climax' || role === 'chorus' ? 1 : 2;
+
+  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
+    const c = progression.chords[chordIdx];
+    const base = [c.rootMelody, c.thirdMelody, c.fifthMelody];
+    const tones =
+      mode === 'octaves'
+        ? [c.rootMelody, clampNote(c.rootMelody + 12), c.fifthMelody, clampNote(c.thirdMelody + 12)]
+        : mode === 'random'
+          ? base
+          : [...base, clampNote(c.rootMelody + 12), c.fifthMelody, c.thirdMelody]; // updown
+
+    let t = 0;
+    for (let i = 0; i < ROWS_PER_CHORD; i += step) {
+      const row = chordIdx * ROWS_PER_CHORD + i;
+      notes[row] = mode === 'random' ? pick(tones) : tones[t % tones.length];
+      t++;
+    }
+  }
+
+  return [CH_ARP, 0, ...notes];
+}
+
+// --- PAD --------------------------------------------------------------------
+// Long sustained chord tones underneath everything. Sparse by design: one or
+// two notes per chord, letting the instrument's release do the work.
+
+export function generatePadChannel(
+  progression: ChordProgression,
+  algo: string | null,
+  role: string,
+): ChannelData {
+  const notes: number[] = Array(ROWS).fill(0);
+  const mode = algo ?? 'sustain';
+
+  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
+    const c = progression.chords[chordIdx];
+    const start = chordIdx * ROWS_PER_CHORD;
+
+    if (mode === 'stab') {
+      notes[start] = c.thirdMelody;
+    } else if (mode === 'swell') {
+      // Enter late in the segment so the pad rises into the next chord
+      notes[start + 4] = c.rootMelody;
+    } else {
+      notes[start] = c.rootMelody;
+      if (role === 'climax' || role === 'chorus') notes[start + 4] = c.fifthMelody;
+    }
+  }
+
+  return [CH_PAD, 0, ...notes];
 }

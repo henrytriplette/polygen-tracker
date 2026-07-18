@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, CHANNEL_SOUND_OPTIONS, VIBE_GROUPS } from '../store';
-import { DRUM_NOTES, FX_VALUES, drumNoteToName, effectToDisplayString, noteToZzfxm, zzfxmToNoteName } from '../engine';
+import {
+  CHANNEL_COUNT,
+  DRUM_HIT_NOTE,
+  FX_VALUES,
+  drumChannelLabel,
+  effectToDisplayString,
+  isDrumChannel,
+  noteToZzfxm,
+  zzfxmToNoteName,
+} from '../engine';
 import type { VibeName } from '../engine';
 
 const state = store.state;
@@ -36,14 +45,12 @@ const PIANO_KEYS: Record<string, number> = {
   q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20, y: 21, '7': 22, u: 23,
 };
 
-const DRUM_KEYS: Record<string, number> = {
-  '1': DRUM_NOTES.KICK,
-  '2': DRUM_NOTES.SNARE,
-  '3': DRUM_NOTES.HAT,
-};
+// On a drum channel every hit is the same one-shot; 1 places it.
+const DRUM_KEYS = new Set(['1', '2', '3']);
 
 function selectCell(ch: number, row: number, lane: 'note' | 'fx' = 'note') {
   cursor.value = { ch, row, lane };
+  state.instrumentChannel = ch; // the instrument panel follows the cursor
   gridEl.value?.focus();
 }
 
@@ -52,7 +59,8 @@ function moveCursor(dCol: number, dRow: number) {
   const { ch, row, lane } = cursor.value;
   // Horizontal movement walks columns: note, fx, note, fx, ... across channels
   let col = ch * 2 + (lane === 'fx' ? 1 : 0) + dCol;
-  col = ((col % 8) + 8) % 8;
+  const columns = CHANNEL_COUNT * 2;
+  col = ((col % columns) + columns) % columns;
   cursor.value = {
     ch: Math.floor(col / 2),
     lane: col % 2 === 0 ? 'note' : 'fx',
@@ -129,8 +137,8 @@ function onKey(e: KeyboardEvent) {
   if (key === '.') { store.setNote(cursor.value.ch, cursor.value.row, 0); moveCursor(0, 1); e.preventDefault(); return; }
 
   // Drums: 1/2/3 = kick/snare/hat (takes priority over the piano's sharp digits)
-  if (cursor.value.ch === 3 && key in DRUM_KEYS) {
-    enterNote(DRUM_KEYS[key]);
+  if (isDrumChannel(cursor.value.ch) && DRUM_KEYS.has(key)) {
+    enterNote(DRUM_HIT_NOTE);
     e.preventDefault();
     return;
   }
@@ -156,7 +164,7 @@ const liveRow = computed(() => {
 function noteAt(ch: number, row: number): string {
   const note = pattern.value[ch][row + 2];
   if (note <= 0) return '---';
-  return ch === 3 ? drumNoteToName(note) : zzfxmToNoteName(note);
+  return isDrumChannel(ch) ? drumChannelLabel(ch) : zzfxmToNoteName(note);
 }
 
 function fxAt(ch: number, row: number): string {
@@ -240,7 +248,7 @@ function hasNote(ch: number, row: number): boolean {
           :class="{ beat: (row - 1) % 4 === 0, live: liveRow === row - 1 }"
         >
           <td class="rownum">{{ (row - 1).toString(16).toUpperCase().padStart(2, '0') }}</td>
-          <template v-for="ch in 4" :key="ch">
+          <template v-for="ch in CHANNEL_COUNT" :key="ch">
             <td
               class="note"
               :style="hasNote(ch - 1, row - 1) ? { color: store.channelColor(ch - 1) } : undefined"

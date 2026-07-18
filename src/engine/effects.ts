@@ -1,7 +1,8 @@
 import {
   EffectCode, NoteEffect, ChannelEffects, PatternEffects,
   ZzFXSound, SongConfig, SectionRole, VibeName, Pattern,
-  DRUM_NOTES,
+  ChannelFamily, CHANNEL_COUNT, CH_KICK, CH_SNARE, CH_HAT,
+  channelFamily, isDrumChannel,
 } from './types';
 import { VIBE_CONFIG } from './vibes';
 
@@ -76,13 +77,22 @@ export const FX_VALUES: Record<EffectCode, number> = {
 // Drums need a heavier pitch drop for audible thump
 const DRUM_PD_VALUE = 0xA0;
 
-// Which effects each logical channel can use
-const CHANNEL_FX_POOLS: EffectCode[][] = [
-  ['SU', 'SD', 'VB', 'DT', 'ST', 'PD'], // Lead — full expression palette
-  ['VB', 'DT', 'ST'],                     // Harmony — subtle, don't compete
-  ['SD', 'ST', 'PD'],                     // Bass — grounded
-  ['PD', 'BC'],                            // Drums — punch kicks, crunch snares
-];
+// Which effects each channel family can use
+const FAMILY_FX_POOLS: Record<ChannelFamily, EffectCode[]> = {
+  lead: ['SU', 'SD', 'VB', 'DT', 'ST', 'PD'], // full expression palette
+  harmony: ['VB', 'DT', 'ST'],                 // subtle, don't compete
+  bass: ['SD', 'ST', 'PD'],                    // grounded
+  drums: ['PD', 'BC'],                         // punch kicks, crunch snares
+};
+
+// Index into the per-vibe FX tables below (which stay 4 entries wide):
+// every channel maps onto one of the four families.
+const FAMILY_FX_INDEX: Record<ChannelFamily, number> = {
+  lead: 0,
+  harmony: 1,
+  bass: 2,
+  drums: 3,
+};
 
 // Per-vibe: which effect does each channel favor?
 // Ranked by preference — index 0 is the primary, index 1 is secondary.
@@ -210,22 +220,12 @@ const EFFECT_POSITIONS: Record<EffectCode, PositionType[]> = {
   TR: ['heldNote'],               // volume wobble on sustained notes
 };
 
-// Drum-specific: classify by drum type for targeted effects
-function classifyDrumPositions(notes: number[]): { kicks: number[]; snares: number[] } {
-  const kicks: number[] = [];
-  const snares: number[] = [];
-  for (let row = 0; row < 32; row++) {
-    if (notes[row] === DRUM_NOTES.KICK) kicks.push(row);
-    else if (notes[row] === DRUM_NOTES.SNARE) snares.push(row);
-  }
-  return { kicks, snares };
-}
-
-// Map drum effect codes to which drum hits they target
-const DRUM_EFFECT_TARGETS: Record<EffectCode, 'kicks' | 'snares'> = {
-  PD: 'kicks',   // pitch drop punches kicks
-  BC: 'snares',  // bit crush crunches snares
-  SU: 'kicks', SD: 'kicks', VB: 'kicks', DT: 'kicks', ST: 'kicks', TR: 'kicks', // unused but typed
+// Each drum channel has one kind of hit now, so the preferred effect is
+// chosen per channel rather than per note value.
+const DRUM_CHANNEL_EFFECT: Record<number, EffectCode> = {
+  [CH_KICK]: 'PD',   // pitch drop punches kicks
+  [CH_SNARE]: 'BC',  // bit crush crunches snares
+  [CH_HAT]: 'BC',    // light crunch on hats
 };
 
 function classifyPositions(notes: number[]): Record<PositionType, number[]> {
@@ -295,20 +295,21 @@ export function generateChannelEffects(
   role: SectionRole,
   vibeOverride?: VibeName,
 ): ChannelEffects {
-  if (channelIndex >= CHANNEL_FX_POOLS.length) return Array(32).fill(null);
-  const pool = CHANNEL_FX_POOLS[channelIndex];
+  if (channelIndex >= CHANNEL_COUNT) return Array(32).fill(null);
+  const family = channelFamily(channelIndex);
+  const pool = FAMILY_FX_POOLS[family];
   if (!pool || pool.length === 0) return Array(32).fill(null);
 
-  const budget = ROLE_BUDGETS[role][channelIndex] ?? 0;
+  const budget = ROLE_BUDGETS[role][FAMILY_FX_INDEX[family]] ?? 0;
   if (budget <= 0) return Array(32).fill(null);
 
-  // Get this vibe's ranked effects for this channel
-  const vibePrefs = VIBE_CHANNEL_FX[vibeOverride ?? config.vibe][channelIndex];
+  // Get this vibe's ranked effects for this channel's family
+  const vibePrefs = VIBE_CHANNEL_FX[vibeOverride ?? config.vibe][FAMILY_FX_INDEX[family]];
   if (!vibePrefs || vibePrefs.length === 0) return Array(32).fill(null);
 
-  // Drums use a separate placement strategy based on drum type
-  if (channelIndex === 3) {
-    return generateDrumEffects(notes, vibePrefs, budget, role);
+  // Each drum channel places its own effect on its strongest hits
+  if (isDrumChannel(channelIndex)) {
+    return generateDrumEffects(channelIndex, notes, budget);
   }
 
   // Primary effect: always the top-ranked preference
@@ -368,52 +369,33 @@ export function generateChannelEffects(
 // Drum-specific effect placement: target kicks with PD, snares with BC.
 // Prefers downbeat kicks (rows 0, 16) and backbeat snares (rows 8, 24)
 // for musical consistency. Uses mirroring (row N ↔ row N±16).
+// One drum per channel: place that channel's effect on its strongest hits
+// (downbeats first), mirroring rows N and N±16 for ABAB consistency.
 function generateDrumEffects(
+  channelIndex: number,
   notes: number[],
-  vibePrefs: EffectCode[],
   budget: number,
-  role: SectionRole,
 ): ChannelEffects {
   const effects: (NoteEffect | null)[] = Array(32).fill(null);
-  const { kicks, snares } = classifyDrumPositions(notes);
+  const code = DRUM_CHANNEL_EFFECT[channelIndex];
+  if (!code) return effects;
 
-  const primaryEffect = vibePrefs[0];
-  const secondaryEffect = vibePrefs.length > 1 ? vibePrefs[1] : null;
-  const useSecondary = secondaryEffect && role === 'climax' && budget >= 3;
+  // Hats are decoration — give them at most one accent
+  const effectiveBudget = channelIndex === CH_HAT ? Math.min(1, budget) : budget;
+  if (effectiveBudget <= 0) return effects;
 
-  const secondaryBudget = useSecondary ? Math.min(2, Math.floor(budget / 3)) : 0;
-  const primaryBudget = budget - secondaryBudget;
+  const hits: number[] = [];
+  for (let row = 0; row < 32; row++) if (notes[row] > 0) hits.push(row);
 
-  // Primary: target the drum type this effect is meant for
-  const primaryTargets = DRUM_EFFECT_TARGETS[primaryEffect] === 'snares' ? snares : kicks;
-  // Prefer downbeat positions (0, 8, 16, 24) — sort by musical weight
-  const sortedPrimary = [...primaryTargets].sort((a, b) => {
+  const sorted = [...hits].sort((a, b) => {
     const aDown = a % 8 === 0 ? 0 : 1;
     const bDown = b % 8 === 0 ? 0 : 1;
     return aDown - bDown || a - b;
   });
-  const primaryPositions = selectPositions(sortedPrimary, notes, primaryBudget);
-  for (const pos of primaryPositions) {
-    const value = primaryEffect === 'PD' ? DRUM_PD_VALUE : FX_VALUES[primaryEffect];
-    effects[pos] = { code: primaryEffect, value };
-  }
 
-  // Secondary: target the other drum type
-  if (useSecondary && secondaryEffect && secondaryBudget > 0) {
-    const secondaryTargets = DRUM_EFFECT_TARGETS[secondaryEffect] === 'snares' ? snares : kicks;
-    const usedSet = new Set(primaryPositions);
-    const sortedSecondary = [...secondaryTargets]
-      .filter(p => !usedSet.has(p))
-      .sort((a, b) => {
-        const aDown = a % 8 === 0 ? 0 : 1;
-        const bDown = b % 8 === 0 ? 0 : 1;
-        return aDown - bDown || a - b;
-      });
-    const secondaryPositions = selectPositions(sortedSecondary, notes, secondaryBudget);
-    for (const pos of secondaryPositions) {
-      const value = secondaryEffect === 'PD' ? DRUM_PD_VALUE : FX_VALUES[secondaryEffect];
-      effects[pos] = { code: secondaryEffect, value };
-    }
+  const value = code === 'PD' ? DRUM_PD_VALUE : FX_VALUES[code];
+  for (const pos of selectPositions(sorted, notes, effectiveBudget)) {
+    effects[pos] = { code, value };
   }
 
   return effects;
@@ -425,10 +407,7 @@ export function generatePatternEffects(
   role: SectionRole,
   channelVibes?: (VibeName | null)[],
 ): PatternEffects {
-  return [
-    generateChannelEffects(0, pattern[0].slice(2), config, role, channelVibes?.[0] ?? undefined),
-    generateChannelEffects(1, pattern[1].slice(2), config, role, channelVibes?.[1] ?? undefined),
-    generateChannelEffects(2, pattern[2].slice(2), config, role, channelVibes?.[2] ?? undefined),
-    generateChannelEffects(3, pattern[3].slice(2), config, role, channelVibes?.[3] ?? undefined),
-  ];
+  return Array.from({ length: CHANNEL_COUNT }, (_, ch) =>
+    generateChannelEffects(ch, pattern[ch].slice(2), config, role, channelVibes?.[ch] ?? undefined)
+  );
 }

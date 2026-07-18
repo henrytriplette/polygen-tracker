@@ -6,11 +6,13 @@ Click GENERATE and get a complete 4-channel retro song — lead, harmony, bass, 
 
 ## Features
 
-- **Instant song generation** — drums (kick templates + probability), bass (Euclidean rhythms), melody (constrained random walk with motifs), harmony (arpeggiated chord tones), all locked to the chosen key/scale
+- **8 channels, matching the Polyend's 8 audio tracks** — LEAD, HARM, BASS, KICK, SNR, HAT, ARP, PAD. Each drum gets its own track (so a kick and hat can sound on the same row), and the ARP/PAD channels fill out the arrangement. Channels map 1:1 onto tracks and instrument slots on export
+- **Instant song generation** — drums (kick templates + probability), bass (Euclidean rhythms), melody (constrained random walk with motifs), harmony (arpeggiated chord tones), arpeggios and sustained pads, all locked to the chosen key/scale
 - **Selectable song structures** — AUTO uses each vibe's own genre forms, or pick a named structure that works with any vibe: VERSE-CHORUS, VERSE-REFRAIN, AABA (32-bar), HOOK-FIRST (opens on the chorus), BUILD-DROP, LOOP, or THROUGH-COMPOSED. Section roles now include **chorus** (denser hook, ×1.3 melody) and **refrain** (prominent lead line over thinned backing) alongside verse/contrast/bridge/breakdown/climax
 - **15 vibe templates** in short/long/epic lengths, picked from a grouped dropdown — GAME (Adventure, Battle, Dungeon, Title Screen, Boss), ELECTRONIC (Synthwave, House, Techno, Dub, IDM, Hardcore, DnB), and CLASSICS (Lo-Fi hip-hop, Funk, Punk). Each has genre-authentic structure (verse–chorus, build–drop, hypnotic loops, dub versions with dropouts, vamps), chord progressions (retrowave i-VI-III-VII, jazzy ii-V-I, techno drones, hoover riffs…), drum templates (four-on-the-floor, one-drop, two-step breaks, euclidean IDM scatters, gabber kick walls), bass style, instrument palette, effects, and song-name generator.
 - **Live playback** — WebAudio rendering via ZzFX/ZzFXM (~1KB synth), per-channel mute/solo, playhead in the grid
 - **Per-pattern and per-channel regeneration** — keep what you like, reroll the rest
+- **Instrument editor** — a collapsible panel with a tab per channel (it follows the grid cursor). 20 ZzFX parameters grouped into TONE / ENVELOPE / MOTION / TEXTURE with labelled sliders and real units (ms, Hz, %, waveform names), a live ADSR curve drawn in the channel's colour, plus audition, timbre reroll, and a **lock** that pins a sound so GENERATE and vibe changes can't replace it. Every edit is auditioned instantly and hot-swapped into playback
 - **Note editing** — click any note cell and type tracker-style: `Z`–`M` play the current octave (`Q`–`U` one up, FastTracker layout), `1/2/3` place kick/snare/hat on the drum track, `Del` clears, `+`/`-` shifts octave, arrows move the cursor, `Esc` exits. Entered notes are auditioned instantly and hot-swapped into playback. Scale-snapping (toggleable in the edit bar) keeps entered notes in the song's key/scale
 - **Chord generator** — each pattern's 4-chord progression (one per 8 rows) is shown in a chord bar with roman-numeral + chord-name selects; edit any chord or ROLL a new progression, and harmony + bass regenerate to follow while your lead stays untouched. Channel regeneration also reuses the stored progression, so channels never drift apart harmonically
 - **Per-channel vibe overrides** — give each instrument its own genre (e.g. house drums under a dungeon lead, funk bass, lo-fi chords). The channel takes its pattern style, density, instrument sound, and effects from its own vibe; chord-progression flavor follows the harmony channel; key/scale/BPM stay global so everything remains locked together
@@ -32,7 +34,8 @@ Click GENERATE and get a complete 4-channel retro song — lead, harmony, bass, 
 
 ## Polyend export details
 
-- Pitch mapping: zzfxm note 12 = C4 = Polyend note byte 48; melodic samples are rendered at base pitch and repitched by the hardware
+- One `.pti` per channel (`01 Lead` … `08 Pad`), and pattern track N = channel N, so nothing is merged or remapped
+- Pitch mapping: zzfxm note 12 = C4 = Polyend note byte 48; melodic samples are rendered at base pitch and repitched by the hardware, while drum tracks always trigger at C4 (one-shot)
 - Generator note effects are mapped to native step FX where an equivalent exists (Slide Up/Down, Gate Length, Bit Depth, Finetune/Volume LFO); duty-cycle and pitch-drop effects play clean
 - Device selector for pattern track slots: 12 (original Tracker on firmware 1.9+, 8 audio + 4 MIDI — default), 8 (original Tracker on firmware ≤ 1.8), or 16 (Tracker+ / Mini). The song itself always uses tracks 1–4.
 

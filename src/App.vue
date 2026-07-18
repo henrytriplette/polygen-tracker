@@ -4,6 +4,7 @@ import { store, VIBE_GROUPS } from './store';
 import { CHROMATIC, STRUCTURE_OPTIONS } from './engine';
 import type { NoteName, ScaleName, SongLength, VibeName } from './engine';
 import ChordBar from './components/ChordBar.vue';
+import InstrumentPanel from './components/InstrumentPanel.vue';
 import Oscilloscope from './components/Oscilloscope.vue';
 import SequenceBar from './components/SequenceBar.vue';
 import TrackerGrid from './components/TrackerGrid.vue';
@@ -223,6 +224,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 
     <SequenceBar />
     <ChordBar />
+    <InstrumentPanel />
 
     <main class="main">
       <TrackerGrid />
