@@ -118,6 +118,14 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
       <button class="btn" :disabled="!state.undoCount" title="Undo (Ctrl+Z)" @click="store.undo()">↶</button>
       <button class="btn" :disabled="!state.redoCount" title="Redo (Ctrl+Y)" @click="store.redo()">↷</button>
       <button class="btn" title="Small variation of the selected pattern" @click="store.mutate()">🧬 MUTATE</button>
+      <button
+        class="btn"
+        :disabled="!store.canResample()"
+        :title="store.canResample()
+          ? 'Learn this pattern\'s lead and write a new one in the same style'
+          : 'Needs a few more notes in the lead to learn from'"
+        @click="store.resampleLead()"
+      >⛓ RESAMPLE</button>
       <button class="btn primary" @click="store.newSong()">⟳ GENERATE</button>
       <button class="btn play" :class="{ active: state.isPlaying }" @click="store.togglePlay()">
         {{ state.isPlaying ? '■ STOP' : '▶ PLAY' }}

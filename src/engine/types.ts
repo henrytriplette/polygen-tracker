@@ -217,7 +217,15 @@ export interface Song {
   structureId?: string | null;
   /** Per-channel: keep this instrument when regenerating the song. */
   lockedInstruments?: boolean[];
+  /** How chord progressions are chosen: curated pools, or a Markov walk. */
+  chordMode?: ChordMode;
 }
+
+/**
+ * 'pool'   — pick from the vibe's curated progressions (the original behaviour)
+ * 'markov' — walk that vibe's harmonic transition chain
+ */
+export type ChordMode = 'pool' | 'markov';
 
 export interface ScaleNote {
   name: string;

@@ -2,6 +2,17 @@ export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithN
 export { STRUCTURE_OPTIONS, findStructure } from './structures';
 export { mutatePattern } from './mutate';
 export {
+  MELODIC_STYLES,
+  VIBE_MELODIC_STYLE,
+  HARMONIC_STYLES,
+  VIBE_HARMONIC_STYLE,
+  markovProgressionDegrees,
+  melodicStyleFor,
+} from './markov';
+export { generateMarkovMelody, learnMelodyTable } from './melody';
+export { progressionDegreesFor, resampleLead, canResampleLead, MIN_LEARN_NOTES } from './song';
+export type { ChordMode } from './types';
+export {
   PARAM_DEFS,
   PARAM_GROUPS,
   SHAPE_NAMES,

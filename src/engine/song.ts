@@ -11,6 +11,8 @@ import {
   ChannelEffects,
   ChannelVibes,
   ChannelSounds,
+  ChordMode,
+  CHORD_SEGMENTS,
   NoteEffect,
   VibeName,
   CHANNEL_COUNT,
@@ -29,9 +31,11 @@ import { VIBE_CONFIG, getRandomBpm } from './vibes';
 import { generateInstruments, generateInstrumentForChannel } from './instruments';
 import { generateDrumPattern } from './drums';
 import { generateBassPattern } from './bass';
-import { generateMelodyPattern } from './melody';
+import { generateMelodyPattern, generateMarkovMelody, learnMelodyTable } from './melody';
 import { generateHarmonyPattern } from './harmony';
 import { progressionFromDegrees, randomProgressionDegrees, ChordProgression } from './chords';
+import { markovProgressionDegrees } from './markov';
+import { getScaleNotes } from './scales';
 import {
   ChannelAlgos,
   generateAcidBass,
@@ -97,10 +101,21 @@ function makeLead(
   config: SongConfig,
   density: number,
   progression: ChordProgression,
+  vibe: VibeName,
+  sourceNotes?: number[],
 ): ChannelData {
   switch (algo) {
     case 'arp': return generateArpLead(progression, density);
     case 'riff': return generateRiffLead(config.key, config.scale, progression);
+    case 'markov':
+      return generateMarkovMelody(config.key, config.scale, density, progression, vibe);
+    case 'markovLearn': {
+      // Resample the melody that is already there; with nothing to learn from
+      // (fresh generation) this falls back to the vibe's own priors.
+      const scaleNotes = getScaleNotes(config.key, config.scale, 4, 5).map((n) => n.note);
+      const learned = sourceNotes ? learnMelodyTable(sourceNotes, scaleNotes) : null;
+      return generateMarkovMelody(config.key, config.scale, density, progression, vibe, learned);
+    }
     default: return generateMelodyPattern(config.key, config.scale, density, progression);
   }
 }
@@ -157,12 +172,23 @@ function allChannelIndices(): number[] {
   return Array.from({ length: CHANNEL_COUNT }, (_, i) => i);
 }
 
+/**
+ * Chord degrees for a pattern: either a curated progression from the vibe's
+ * pool, or a walk of that vibe's harmonic Markov chain.
+ */
+export function progressionDegreesFor(vibe: VibeName, mode: ChordMode | undefined): number[] {
+  return mode === 'markov'
+    ? markovProgressionDegrees(vibe, CHORD_SEGMENTS)
+    : randomProgressionDegrees(vibe);
+}
+
 function generatePatternForRole(
   config: SongConfig,
   role: SectionRole,
   channelVibes?: ChannelVibes,
   fixedDegrees?: number[],
   channelAlgos?: ChannelAlgos,
+  chordMode?: ChordMode,
 ): { pattern: Pattern; effects: PatternEffects; degrees: number[] } {
   const melodyVibe = vibeAt(config, channelVibes, CH_LEAD);
   const harmonyVibe = vibeAt(config, channelVibes, CH_HARMONY);
@@ -173,7 +199,7 @@ function generatePatternForRole(
   // scale stay global, so every channel remains harmonically locked.
   // A user-edited progression (fixedDegrees) takes precedence.
   const length = config.patternLength ?? DEFAULT_PATTERN_LENGTH;
-  const degrees = fixedDegrees ?? randomProgressionDegrees(harmonyVibe);
+  const degrees = fixedDegrees ?? progressionDegreesFor(harmonyVibe, chordMode);
   const progression = progressionFromDegrees(degrees, config.key, config.scale, length);
 
   // Drums always play (backbone of every section) — kick/snare/hat channels
@@ -202,7 +228,7 @@ function generatePatternForRole(
 
   // Breakdown: lead, harmony and arp drop out; bass + drums carry it
   if (role !== 'breakdown') {
-    const melodyChannel = makeLead(channelAlgos?.[CH_LEAD] ?? null, config, melodyDensity, progression);
+    const melodyChannel = makeLead(channelAlgos?.[CH_LEAD] ?? null, config, melodyDensity, progression, melodyVibe);
     const melodyNotes = melodyChannel.slice(2);
     const harmonyChannel = makeHarmony(channelAlgos?.[CH_HARMONY] ?? null, config, melodyNotes, progression);
 
@@ -246,6 +272,7 @@ export function generateSong(
   channelAlgos?: ChannelAlgos,
   structureId?: string | null,
   channelSounds?: ChannelSounds,
+  chordMode?: ChordMode,
 ): Song {
   const vibe: VibeName = config?.vibe ?? 'adventure';
   const vibeConfig = VIBE_CONFIG[vibe];
@@ -284,7 +311,7 @@ export function generateSong(
   for (let i = 0; i < template.roles.length; i++) {
     const label = PATTERN_LABELS[i];
     const role = template.roles[i];
-    const { pattern, effects, degrees } = generatePatternForRole(fullConfig, role, vibes, undefined, algos);
+    const { pattern, effects, degrees } = generatePatternForRole(fullConfig, role, vibes, undefined, algos, chordMode);
     patterns[label] = pattern;
     patternRoles[label] = role;
     patternEffects[label] = effects;
@@ -305,6 +332,7 @@ export function generateSong(
     channelSounds: sounds,
     patternChords,
     structureId: structureId ?? null,
+    chordMode: chordMode ?? 'pool',
   };
 }
 
@@ -326,7 +354,8 @@ export function regenerateForVibe(song: Song, newVibe: VibeName): Song {
     song.channelVibes,
     song.channelAlgos,
     song.structureId,
-    song.channelSounds
+    song.channelSounds,
+    song.chordMode
   );
 }
 
@@ -349,7 +378,7 @@ export function regenerateAllPatterns(
     // Keep the stored progression: chords are scale degrees, so they stay
     // valid when only the key/scale changes.
     const { pattern, effects, degrees } = generatePatternForRole(
-      newConfig, role, song.channelVibes, song.patternChords?.[label], song.channelAlgos
+      newConfig, role, song.channelVibes, song.patternChords?.[label], song.channelAlgos, song.chordMode
     );
     patterns[label] = pattern;
     patternEffects[label] = effects;
@@ -387,7 +416,7 @@ export function regenerateWithNewLength(
     const label = PATTERN_LABELS[i];
     const role = template.roles[i];
     const { pattern, effects, degrees } = generatePatternForRole(
-      newConfig, role, song.channelVibes, undefined, song.channelAlgos
+      newConfig, role, song.channelVibes, undefined, song.channelAlgos, song.chordMode
     );
     patterns[label] = pattern;
     patternRoles[label] = role;
@@ -426,7 +455,7 @@ export function applySongStructure(song: Song, structureId: string | null): Song
     const label = PATTERN_LABELS[i];
     const role = template.roles[i];
     const { pattern, effects, degrees } = generatePatternForRole(
-      song.config, role, song.channelVibes, undefined, song.channelAlgos
+      song.config, role, song.channelVibes, undefined, song.channelAlgos, song.chordMode
     );
     patterns[label] = pattern;
     patternRoles[label] = role;
@@ -465,12 +494,67 @@ export function regenerateChannelInAllPatterns(
   return next;
 }
 
+/** Notes a lead needs before a learned chain says anything meaningful. */
+export const MIN_LEARN_NOTES = 4;
+
+export function canResampleLead(song: Song, patternLabel: PatternLabel): boolean {
+  const lead = song.patterns[patternLabel]?.[CH_LEAD];
+  if (!lead) return false;
+  return lead.slice(2).filter((n) => n > 0).length >= MIN_LEARN_NOTES;
+}
+
+/**
+ * Learn the melodic dialect of this pattern's current lead and write a new
+ * lead drawn from it. Unlike the MARKOV-LEARN algorithm this always learns,
+ * whatever the channel's algorithm happens to be set to.
+ */
+export function resampleLead(song: Song, patternLabel: PatternLabel): Song {
+  if (!canResampleLead(song, patternLabel)) return song;
+
+  const role = song.patternRoles[patternLabel] ?? 'verse';
+  const length = songPatternLength(song);
+  const vibe = vibeAt(song.config, song.channelVibes, CH_LEAD);
+  const degrees = song.patternChords?.[patternLabel]
+    ?? progressionDegreesFor(vibeAt(song.config, song.channelVibes, CH_HARMONY), song.chordMode);
+  const progression = progressionFromDegrees(degrees, song.config.key, song.config.scale, length);
+
+  const scaleNotes = getScaleNotes(song.config.key, song.config.scale, 4, 5).map((n) => n.note);
+  const sourceNotes = song.patterns[patternLabel][CH_LEAD].slice(2);
+  const learned = learnMelodyTable(sourceNotes, scaleNotes);
+  if (!learned) return song;
+
+  const density = Math.min(
+    1,
+    VIBE_CONFIG[vibe].melodyDensity * ROLE_MELODY_MULTIPLIER[role]
+  );
+
+  const pattern = [...song.patterns[patternLabel]] as Pattern;
+  pattern[CH_LEAD] = generateMarkovMelody(
+    song.config.key, song.config.scale, density, progression, vibe, learned
+  );
+
+  const existingEffects = song.patternEffects?.[patternLabel];
+  const effects: PatternEffects = Array.from(
+    { length: CHANNEL_COUNT },
+    (_, ch) => existingEffects?.[ch] ?? Array(length).fill(null)
+  );
+  effects[CH_LEAD] = generateChannelEffects(
+    CH_LEAD, pattern[CH_LEAD].slice(2), song.config, role, vibe
+  );
+
+  return {
+    ...song,
+    patterns: { ...song.patterns, [patternLabel]: pattern },
+    patternEffects: { ...song.patternEffects, [patternLabel]: effects },
+  };
+}
+
 /** Append a freshly generated pattern (next free label, up to 8). */
 export function addPatternToSong(song: Song, role: SectionRole = 'verse'): Song {
   if (song.patternOrder.length >= PATTERN_LABELS.length) return song;
   const label = PATTERN_LABELS[song.patternOrder.length];
   const { pattern, effects, degrees } = generatePatternForRole(
-    song.config, role, song.channelVibes, undefined, song.channelAlgos
+    song.config, role, song.channelVibes, undefined, song.channelAlgos, song.chordMode
   );
   return {
     ...song,
@@ -487,7 +571,7 @@ export function regeneratePattern(
   patternLabel: PatternLabel
 ): { pattern: Pattern; effects: PatternEffects; degrees: number[] } {
   const role = song.patternRoles[patternLabel] ?? 'verse';
-  return generatePatternForRole(song.config, role, song.channelVibes, undefined, song.channelAlgos);
+  return generatePatternForRole(song.config, role, song.channelVibes, undefined, song.channelAlgos, song.chordMode);
 }
 
 export function regenerateChannel(
@@ -511,7 +595,7 @@ export function regenerateChannel(
   // Reuse the pattern's stored progression so the regenerated channel stays
   // harmonically aligned with the others; fall back to a fresh one.
   const degrees = song.patternChords?.[patternLabel]
-    ?? randomProgressionDegrees(vibeAt(song.config, song.channelVibes, CH_HARMONY));
+    ?? progressionDegreesFor(vibeAt(song.config, song.channelVibes, CH_HARMONY), song.chordMode);
   const progression = progressionFromDegrees(degrees, song.config.key, song.config.scale, length);
 
   const melodyMult = ROLE_MELODY_MULTIPLIER[role];
@@ -526,7 +610,9 @@ export function regenerateChannel(
         : makeLead(
             algos?.[CH_LEAD] ?? null, song.config,
             Math.min(1, channelVibeConfig.melodyDensity * melodyMult),
-            progression
+            progression, channelVibe,
+            // the current lead is the training material for markovLearn
+            song.patterns[patternLabel]?.[CH_LEAD]?.slice(2)
           );
       break;
     }

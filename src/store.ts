@@ -10,11 +10,13 @@ import {
   applyChannelSound,
   applyChordsToPattern,
   applySongStructure,
+  canResampleLead,
+  resampleLead,
   floatsToWav,
   generateSong,
   getRandomBpm,
   mutatePattern,
-  randomProgressionDegrees,
+  progressionDegreesFor,
   randomSeed,
   regenerateAllPatterns,
   regenerateChannel,
@@ -39,7 +41,7 @@ import {
 import type { PatternLength } from './engine';
 
 export { PATTERN_LENGTHS };
-import type { ChannelAlgos, NoteEffect, Pattern, PatternEffects } from './engine';
+import type { ChannelAlgos, ChordMode, NoteEffect, Pattern, PatternEffects } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
 
 // Selectable timbre palette per channel (re-exported from the engine so the
@@ -52,6 +54,8 @@ const LEAD_ALGOS = [
   { value: 'walk', label: 'WALK' },
   { value: 'arp', label: 'ARP' },
   { value: 'riff', label: 'RIFF' },
+  { value: 'markov', label: 'MARKOV' },
+  { value: 'markovLearn', label: 'MARKOV-LEARN' },
 ];
 const HARMONY_ALGOS = [
   { value: 'gapfill', label: 'GAPFILL' },
@@ -376,6 +380,22 @@ export const store = {
     afterSongChange();
   },
 
+  /** True when the selected pattern's lead has enough notes to learn from. */
+  canResample(): boolean {
+    return canResampleLead(state.song, state.selectedPattern);
+  },
+
+  /**
+   * Learn the current lead's melodic dialect and write a new lead from it —
+   * a variation in the same voice, rather than a fresh idea.
+   */
+  resampleLead(): void {
+    const next = resampleLead(state.song, state.selectedPattern);
+    if (next === state.song) return;
+    state.song = next;
+    swapAudio();
+  },
+
   mutate(): void {
     const label = state.selectedPattern;
     const pattern = mutatePattern(state.song, label);
@@ -521,9 +541,14 @@ export const store = {
 
   rollChords(): void {
     const vibe = state.song.channelVibes?.[1] ?? state.song.config.vibe;
-    const degrees = randomProgressionDegrees(vibe);
+    const degrees = progressionDegreesFor(vibe, state.song.chordMode);
     state.song = applyChordsToPattern(state.song, state.selectedPattern, degrees);
     swapAudio();
+  },
+
+  /** Curated progression pools, or a walk of the vibe's harmonic chain. */
+  setChordMode(mode: ChordMode): void {
+    state.song = { ...state.song, chordMode: mode };
   },
 
   toggleSnap(): void {

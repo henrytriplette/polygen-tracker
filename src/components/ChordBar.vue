@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { store } from '../store';
 import { CHORDS_PER_PATTERN, chordDisplayName } from '../engine';
+import type { ChordMode } from '../engine';
 
 const state = store.state;
 
@@ -20,6 +21,10 @@ function nameFor(degree: number): string {
 function onChord(slot: number, e: Event) {
   store.setChordDegree(slot, Number((e.target as HTMLSelectElement).value));
 }
+
+function onMode(e: Event) {
+  store.setChordMode((e.target as HTMLSelectElement).value as ChordMode);
+}
 </script>
 
 <template>
@@ -35,7 +40,16 @@ function onChord(slot: number, e: Event) {
         </select>
       </label>
     </div>
-    <button class="dice" title="Random progression (harmony vibe)" @click="store.rollChords()">🎲 ROLL</button>
+    <select
+      class="mode"
+      :value="state.song.chordMode ?? 'pool'"
+      title="POOL = curated progressions for the vibe · MARKOV = walk the vibe's harmonic chain"
+      @change="onMode"
+    >
+      <option value="pool">POOL</option>
+      <option value="markov">MARKOV</option>
+    </select>
+    <button class="dice" title="New progression (harmony vibe)" @click="store.rollChords()">🎲 ROLL</button>
     <span class="chords-hint">harmony + bass follow the chords · lead is untouched</span>
   </div>
 </template>
@@ -88,6 +102,20 @@ function onChord(slot: number, e: Event) {
 }
 
 .chord-slot select:hover { background: var(--field-hover); border-color: var(--fx); }
+
+.mode {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 6px;
+  background: var(--field);
+  color: var(--fx);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-inset);
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.mode:hover { background: var(--field-hover); border-color: var(--fx); }
 
 .dice {
   font-family: var(--mono);
