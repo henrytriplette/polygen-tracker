@@ -1,4 +1,4 @@
-export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, applyChannelVibe, applyChannelAlgo, applyChannelSound, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
+export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, duplicatePatternInSong, applyChannelVibe, applyChannelAlgo, applyChannelSound, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
 export { STRUCTURE_OPTIONS, findStructure } from './structures';
 export { mutatePattern } from './mutate';
 export {

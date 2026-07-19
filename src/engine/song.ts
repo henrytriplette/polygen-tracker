@@ -549,6 +549,34 @@ export function resampleLead(song: Song, patternLabel: PatternLabel): Song {
   };
 }
 
+/** Copy an existing pattern into the next free label (up to 8). */
+export function duplicatePatternInSong(song: Song, sourceLabel: PatternLabel): Song {
+  if (song.patternOrder.length >= PATTERN_LABELS.length) return song;
+  const source = song.patterns[sourceLabel];
+  if (!source) return song;
+
+  const label = PATTERN_LABELS[song.patternOrder.length];
+  const rows = songPatternLength(song);
+  const sourceEffects = song.patternEffects?.[sourceLabel];
+
+  return {
+    ...song,
+    patterns: { ...song.patterns, [label]: source.map((c) => [...c]) as Pattern },
+    patternRoles: { ...song.patternRoles, [label]: song.patternRoles[sourceLabel] ?? 'verse' },
+    patternEffects: {
+      ...song.patternEffects,
+      [label]: Array.from({ length: CHANNEL_COUNT }, (_, ch) => [
+        ...(sourceEffects?.[ch] ?? Array(rows).fill(null)),
+      ]) as PatternEffects,
+    },
+    patternChords: {
+      ...song.patternChords,
+      [label]: [...(song.patternChords?.[sourceLabel] ?? [])],
+    } as Song['patternChords'],
+    patternOrder: [...song.patternOrder, label],
+  };
+}
+
 /** Append a freshly generated pattern (next free label, up to 8). */
 export function addPatternToSong(song: Song, role: SectionRole = 'verse'): Song {
   if (song.patternOrder.length >= PATTERN_LABELS.length) return song;

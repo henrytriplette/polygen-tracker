@@ -11,6 +11,7 @@ import {
   applyChordsToPattern,
   applySongStructure,
   canResampleLead,
+  duplicatePatternInSong,
   resampleLead,
   floatsToWav,
   generateSong,
@@ -177,6 +178,8 @@ interface StoreState {
   shareStatus: '' | 'copied' | 'failed';
   /** Channel the instrument panel should follow (set by the grid cursor). */
   instrumentChannel: number | null;
+  /** Whether a block has been copied (drives the paste hint in the edit bar). */
+  hasClipboard: boolean;
 }
 
 const initialSong = loadCurrent() ?? generateSong();
@@ -200,6 +203,7 @@ const state = reactive<StoreState>({
   follow: false,
   shareStatus: '',
   instrumentChannel: null,
+  hasClipboard: false,
 });
 
 // --- History + autosave ------------------------------------------------------
@@ -249,6 +253,46 @@ function renderBuffers(song: Song): { buffers: [number[], number[]][]; duration:
 function patternRows(): number {
   const first = state.song.patterns[state.song.patternOrder[0]];
   return Math.max(1, (first?.[0]?.length ?? 34) - 2);
+}
+
+// --- Block editing -----------------------------------------------------------
+
+/** An inclusive rectangle of the grid: channels × rows. */
+export interface BlockRect {
+  chStart: number;
+  chEnd: number;
+  rowStart: number;
+  rowEnd: number;
+}
+
+interface ClipBlock {
+  width: number;
+  height: number;
+  notes: number[][];
+  fx: (NoteEffect | null)[][];
+}
+
+let clipboard: ClipBlock | null = null;
+
+/** Mutable copies of the selected pattern's notes and effects. */
+function editablePattern() {
+  const label = state.selectedPattern;
+  const rows = patternRows();
+  const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
+  const existing = state.song.patternEffects?.[label];
+  const effects = Array.from({ length: CHANNEL_COUNT }, (_, ch) => [
+    ...(existing?.[ch] ?? Array(rows).fill(null)),
+  ]) as PatternEffects;
+  return { label, rows, pattern, effects };
+}
+
+function commitPattern(label: PatternLabel, pattern: Pattern, effects: PatternEffects): void {
+  state.song = {
+    ...state.song,
+    patterns: { ...state.song.patterns, [label]: pattern },
+    patternEffects: { ...state.song.patternEffects, [label]: effects },
+  };
+  swapAudio();
 }
 
 function applyGains(): void {
@@ -502,6 +546,18 @@ export const store = {
     swapAudio();
   },
 
+  /** Clone the selected pattern into a new slot and append it to the song. */
+  duplicatePattern(): void {
+    const before = state.song.patternOrder.length;
+    let next = duplicatePatternInSong(state.song, state.selectedPattern);
+    if (next.patternOrder.length === before) return; // already at 8
+    const newIdx = next.patternOrder.length - 1;
+    next = { ...next, sequence: [...next.sequence, newIdx] };
+    state.song = next;
+    state.selectedPattern = next.patternOrder[newIdx];
+    swapAudio();
+  },
+
   addPattern(): void {
     const before = state.song.patternOrder.length;
     let next = addPatternToSong(state.song);
@@ -574,6 +630,96 @@ export const store = {
   setChannelSound(ch: number, sound: string | null): void {
     state.song = applyChannelSound(state.song, ch, sound);
     swapAudio();
+  },
+
+  // --- Block editing (copy / paste / clear / transpose) ---
+
+  /** Copy a rectangle of notes+effects out of the selected pattern. */
+  copyBlock(block: BlockRect): void {
+    const label = state.selectedPattern;
+    const pattern = state.song.patterns[label];
+    const effects = state.song.patternEffects?.[label];
+    const rows = patternRows();
+
+    const notes: number[][] = [];
+    const fx: (NoteEffect | null)[][] = [];
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      const noteCol: number[] = [];
+      const fxCol: (NoteEffect | null)[] = [];
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        noteCol.push(pattern[ch]?.[row + 2] ?? 0);
+        fxCol.push(effects?.[ch]?.[row] ?? null);
+      }
+      notes.push(noteCol);
+      fx.push(fxCol);
+    }
+
+    clipboard = {
+      width: block.chEnd - block.chStart + 1,
+      height: Math.min(block.rowEnd, rows - 1) - block.rowStart + 1,
+      notes,
+      fx,
+    };
+    state.hasClipboard = true;
+  },
+
+  /** Blank the notes and effects inside a rectangle. */
+  clearBlock(block: BlockRect): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        pattern[ch][row + 2] = 0;
+        effects[ch][row] = null;
+      }
+    }
+    commitPattern(label, pattern, effects);
+  },
+
+  cutBlock(block: BlockRect): void {
+    this.copyBlock(block);
+    this.clearBlock(block);
+  },
+
+  /** Paste the clipboard with its top-left corner at (ch, row). */
+  pasteBlock(ch: number, row: number): void {
+    if (!clipboard) return;
+    const { pattern, effects, label, rows } = editablePattern();
+
+    for (let c = 0; c < clipboard.width; c++) {
+      const targetCh = ch + c;
+      if (targetCh >= CHANNEL_COUNT) break;
+      for (let r = 0; r < clipboard.height; r++) {
+        const targetRow = row + r;
+        if (targetRow >= rows) break;
+        const note = clipboard.notes[c]?.[r] ?? 0;
+        // A pitched note pasted onto a drum channel (or vice versa) is
+        // meaningless, so normalise it to that channel's own convention.
+        pattern[targetCh][targetRow + 2] = note > 0 && isDrumChannel(targetCh)
+          ? DRUM_HIT_NOTE
+          : note;
+        effects[targetCh][targetRow] = clipboard.fx[c]?.[r] ?? null;
+      }
+    }
+    commitPattern(label, pattern, effects);
+  },
+
+  /** Shift every pitched note in a rectangle by N semitones. */
+  transposeBlock(block: BlockRect, semitones: number): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    let moved = 0;
+
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      // Drum channels have one fixed hit note — transposing them is meaningless
+      if (isDrumChannel(ch)) continue;
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        const note = pattern[ch][row + 2];
+        if (note <= 0) continue;
+        pattern[ch][row + 2] = Math.max(1, Math.min(48, note + semitones));
+        moved++;
+      }
+    }
+    if (moved === 0) return;
+    commitPattern(label, pattern, effects);
   },
 
   /** Write or clear one step effect in the selected pattern. */

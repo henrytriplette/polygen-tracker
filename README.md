@@ -16,6 +16,7 @@ Click GENERATE and get a complete 8-channel song — lead, chords, bass, kick, s
 
 **Editing**
 - Tracker-style **note and FX editing** with scale-snapping
+- **Block editing** — select, copy/cut/paste, clear and transpose across channels and patterns; duplicate a pattern
 - **Chord bar** — edit the progression directly; harmony and bass follow
 - **Instrument editor** — 20 ZzFX parameters with a live ADSR curve
 - **Arrangement editing** — reorder the song chain, add patterns
@@ -122,7 +123,20 @@ Click any cell to place the cursor, then type:
 | `+` / `-` | octave up/down — or FX value in an FX column |
 | `Del` | clear |
 | arrows | move the cursor across rows and columns |
-| `Esc` | leave edit mode |
+| `Esc` | drop the selection, then leave edit mode |
+
+**Block editing** — select a rectangle and operate on all of it:
+
+| Key | Action |
+|---|---|
+| `Shift`+arrows | extend the selection (shift+click also works) |
+| `Ctrl`+`A` | select the channel, again for the whole pattern |
+| `Ctrl`+`C` / `X` / `V` | copy / cut / paste at the cursor |
+| `Del` | clear the whole selection |
+| `Ctrl`+`↑`/`↓` | transpose by a semitone |
+| `Ctrl`+`Shift`+`↑`/`↓` | transpose by an octave |
+
+Paste puts the block's top-left corner at the cursor, so you can move material between channels and patterns. Pitched notes pasted onto a drum channel become hits (and vice versa), since a pitch means nothing there. Transpose skips drum channels for the same reason. **⧉ DUP** in the sequence bar clones the selected pattern into a new slot, so you can vary a copy without losing the original.
 
 Entered notes are auditioned instantly and hot-swapped into playback. **SNAP** in the edit bar keeps entered notes inside the song's key and scale.
 
@@ -184,6 +198,10 @@ src/
 ```
 
 Polyend file I/O uses the [`@polyend/tracker-lib`](https://github.com/polyend/tracker-lib) npm package. Its public write helpers trigger one browser download per file, so `src/lib/polyend.ts` additionally exposes the package's internal serializer classes (via a `dist` alias in the Vite/TS config) to collect raw buffers for zip packaging — drop the alias once upstream exports buffer-returning writers.
+
+## Ideas
+
+[`IDEAS.md`](IDEAS.md) collects proposed features, framed around a beginner electronic musician using a Polyend Tracker — teaching aids, starting points, arrangement help and further generative algorithms.
 
 ## Credits
 
