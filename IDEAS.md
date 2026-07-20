@@ -6,6 +6,8 @@ That person usually isn't blocked by a missing feature. They're blocked by a bla
 
 Each idea below notes what it is and why it helps. Nothing here is committed to; it's a menu.
 
+For the opposite user — someone already fluent on the device, who wants the machine exposed rather than hidden — see [IDEAS-ADVANCED.md](IDEAS-ADVANCED.md).
+
 ---
 
 ## 1. Teach while it generates
