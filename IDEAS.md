@@ -58,8 +58,8 @@ Beyond the Markov chains already in place.
 
 - **Preset library with descriptions** — instrument presets named for what they *are* ("dusty tape kick", "hoover stab") rather than parameter dumps. Beginners pick sounds by vibe, then learn the parameters by seeing what moved.
 - **"Make it more…" nudges** — one-click transforms on the current instrument: *warmer*, *harder*, *dirtier*, *further away*. Each nudges several ZzFX parameters together, which is how a producer actually thinks.
-- **Parameter explanations in the instrument panel** — the tooltips exist; a short "what this does to the sound" line per group would go further.
-- **Sample-length warnings** — flag instruments whose rendered sample is very long or short before they become `.pti` files.
+- ~~**Parameter explanations in the instrument panel**~~ — *done.* Each group carries a one-line description of what it does to the sound, sitting above its sliders.
+- ~~**Sample-length warnings**~~ — *done.* The panel shows the rendered sample's length and exported size, and warns when an instrument is silent, too short to read as a note, or long enough to eat sample memory (with a specific note for drums, which overlap their own next hit).
 
 ## 7. Listening and feedback
 

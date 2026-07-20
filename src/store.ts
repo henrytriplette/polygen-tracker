@@ -220,20 +220,47 @@ const redoStack: Song[] = [];
 let suppressHistory = false;
 let saveTimer = 0;
 
+// Continuous controls fire one action per input event, so dragging a single
+// slider used to push dozens of undo entries and flush the whole history —
+// losing pattern edits made minutes earlier. Such an action tags its change
+// with a coalesce key instead: while the same key keeps arriving, only the
+// snapshot from before the gesture is kept, so one drag undoes as one step.
+const COALESCE_WINDOW_MS = 600;
+let pendingCoalesce: string | null = null;
+let lastCoalesce: string | null = null;
+let lastCoalesceAt = 0;
+
+/** Merge this change into the previous one if it shares `key`. */
+function coalesceNext(key: string): void {
+  pendingCoalesce = key;
+}
+
 watch(
   () => state.song,
   (_next, prev) => {
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => saveCurrent(state.song), 400);
 
+    const key = pendingCoalesce;
+    pendingCoalesce = null;
+
     if (suppressHistory) {
       suppressHistory = false;
+      // An undo/redo ends any gesture: the next edit must start a new entry.
+      lastCoalesce = null;
       return;
     }
     if (prev) {
-      undoStack.push(prev);
-      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
-      redoStack.length = 0;
+      const now = Date.now();
+      const merge = key !== null && key === lastCoalesce && now - lastCoalesceAt < COALESCE_WINDOW_MS;
+      lastCoalesce = key;
+      lastCoalesceAt = now;
+
+      if (!merge) {
+        undoStack.push(prev);
+        if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+        redoStack.length = 0;
+      }
     }
     state.undoCount = undoStack.length;
     state.redoCount = redoStack.length;
@@ -499,6 +526,7 @@ export const store = {
 
   setBpm(bpm: number): void {
     const clamped = Math.max(40, Math.min(220, Math.round(bpm)));
+    coalesceNext('bpm');
     state.song = { ...state.song, config: { ...state.song.config, bpm: clamped } };
     swapAudio();
   },
@@ -509,17 +537,22 @@ export const store = {
 
   setSwing(percent: number): void {
     const swing = Math.max(0, Math.min(30, Math.round(percent)));
+    coalesceNext('swing');
     state.song = { ...state.song, config: { ...state.song.config, swing } };
     swapAudio();
   },
 
   setHumanize(percent: number): void {
     const humanize = Math.max(0, Math.min(30, Math.round(percent)));
+    coalesceNext('humanize');
     state.song = { ...state.song, config: { ...state.song.config, humanize } };
     swapAudio();
   },
 
   setName(name: string): void {
+    // Typing fires per keystroke; a pause longer than the window starts a new
+    // entry, so undo steps back through phrases rather than characters.
+    coalesceNext('name');
     state.song = { ...state.song, config: { ...state.song.config, name } };
   },
 
@@ -809,6 +842,9 @@ export const store = {
     );
     if (!instruments[ch]) return;
     instruments[ch][index] = value;
+    // One drag of one slider = one undo step; moving to a different slider
+    // (or a different channel) starts a new one.
+    coalesceNext(`inst:${ch}:${index}`);
     state.song = { ...state.song, instruments };
     swapAudio();
     this.previewInstrument(ch);
