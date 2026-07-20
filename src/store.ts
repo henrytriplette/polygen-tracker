@@ -57,6 +57,8 @@ const LEAD_ALGOS = [
   { value: 'riff', label: 'RIFF' },
   { value: 'markov', label: 'MARKOV' },
   { value: 'markovLearn', label: 'MARKOV-LEARN' },
+  { value: 'lsystem', label: 'L-SYSTEM' },
+  { value: 'motif', label: 'MOTIF' },
 ];
 const HARMONY_ALGOS = [
   { value: 'gapfill', label: 'GAPFILL' },
@@ -69,17 +71,20 @@ const BASS_ALGOS = [
   { value: 'acid', label: 'ACID' },
   { value: 'arp', label: 'ARP' },
   { value: 'offbeat', label: 'OFFBEAT' },
+  { value: 'poly', label: 'POLYMETER' },
 ];
 const DRUM_ALGOS = [
   { value: 'template', label: 'TEMPLATE' },
   { value: 'euclid', label: 'EUCLID' },
   { value: 'break', label: 'BREAK' },
   { value: 'four', label: '4-FLOOR' },
+  { value: 'automata', label: 'AUTOMATA' },
 ];
 const ARP_ALGOS = [
   { value: 'updown', label: 'UP-DOWN' },
   { value: 'octaves', label: 'OCTAVES' },
   { value: 'random', label: 'RANDOM' },
+  { value: 'poly', label: 'POLYMETER' },
 ];
 const PAD_ALGOS = [
   { value: 'sustain', label: 'SUSTAIN' },
@@ -700,6 +705,32 @@ export const store = {
         effects[targetCh][targetRow] = clipboard.fx[c]?.[r] ?? null;
       }
     }
+    commitPattern(label, pattern, effects);
+  },
+
+  /**
+   * Give every note in a rectangle a trigger probability. Playback re-rolls
+   * it each render, and it exports as the Polyend's native Chance FX so the
+   * hardware keeps re-rolling too. 0 removes it.
+   */
+  setBlockChance(block: BlockRect, percent: number): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    let touched = 0;
+
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        if (pattern[ch][row + 2] <= 0) continue; // only notes can be chanced
+        const existing = effects[ch][row];
+        if (value === 0) {
+          if (existing?.code === 'CN') effects[ch][row] = null;
+        } else {
+          effects[ch][row] = { code: 'CN', value };
+        }
+        touched++;
+      }
+    }
+    if (touched === 0) return;
     commitPattern(label, pattern, effects);
   },
 

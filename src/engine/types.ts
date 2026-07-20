@@ -22,7 +22,11 @@ export type VibeName =
 export type PatternLabel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
 // Effect codes — retro-authentic per-note effects
-export type EffectCode = 'SU' | 'SD' | 'VB' | 'DT' | 'ST' | 'PD' | 'BC' | 'TR';
+// 'CN' (chance) is not a timbre change like the others — it is a probability
+// that the note triggers at all. Playback re-rolls it on every render, and it
+// maps to the Polyend's native Chance FX, so an exported project stays
+// generative on the hardware.
+export type EffectCode = 'SU' | 'SD' | 'VB' | 'DT' | 'ST' | 'PD' | 'BC' | 'TR' | 'CN';
 
 export const EFFECT_CODES: EffectCode[] = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR'];
 

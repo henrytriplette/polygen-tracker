@@ -43,12 +43,16 @@ import {
   generateArpChannel,
   generateArpHarmony,
   generateArpLead,
+  generateAutomataDrums,
   generateBreakDrums,
   generateEuclidDrums,
   generateFourDrums,
+  generateLSystemLead,
+  generateMotifLead,
   generateOffbeatBass,
   generatePadChannel,
   generatePedalHarmony,
+  generatePolymeterChannel,
   generateRiffLead,
   generateStabsHarmony,
 } from './altPatterns';
@@ -107,6 +111,8 @@ function makeLead(
   switch (algo) {
     case 'arp': return generateArpLead(progression, density);
     case 'riff': return generateRiffLead(config.key, config.scale, progression);
+    case 'lsystem': return generateLSystemLead(config.key, config.scale, density, progression);
+    case 'motif': return generateMotifLead(config.key, config.scale, density, progression);
     case 'markov':
       return generateMarkovMelody(config.key, config.scale, density, progression, vibe);
     case 'markovLearn': {
@@ -146,6 +152,7 @@ function makeBass(
     case 'acid': return generateAcidBass(progression);
     case 'offbeat': return generateOffbeatBass(progression);
     case 'arp': return generateArpBass(progression);
+    case 'poly': return generatePolymeterChannel(progression, CH_BASS, false);
     default: return generateBassPattern(config.key, config.scale, kickPattern, density, vibe, progression);
   }
 }
@@ -155,8 +162,15 @@ function makeDrums(algo: string | null, vibe: VibeName, length: number): DrumCha
     case 'euclid': return generateEuclidDrums(vibe, length);
     case 'break': return generateBreakDrums(length);
     case 'four': return generateFourDrums(length);
+    case 'automata': return generateAutomataDrums(vibe, length);
     default: return generateDrumPattern(vibe, length);
   }
+}
+
+/** ARP channel: its own generators plus the shared polymeter figure. */
+function makeArp(algo: string | null, progression: ChordProgression, role: SectionRole): ChannelData {
+  if (algo === 'poly') return generatePolymeterChannel(progression, CH_ARP, true);
+  return generateArpChannel(progression, algo, role);
 }
 
 function silentChannel(ch: number, length: number = ROWS): ChannelData {
@@ -244,7 +258,7 @@ function generatePatternForRole(
 
     pattern[CH_LEAD] = melodyChannel;
     pattern[CH_HARMONY] = harmonyChannel;
-    pattern[CH_ARP] = generateArpChannel(progression, channelAlgos?.[CH_ARP] ?? null, role);
+    pattern[CH_ARP] = makeArp(channelAlgos?.[CH_ARP] ?? null, progression, role);
   }
 
   // Pads hold through breakdowns — they're the bed everything else sits on
@@ -676,7 +690,7 @@ export function regenerateChannel(
     case CH_ARP: {
       pattern[CH_ARP] = role === 'breakdown'
         ? silentChannel(CH_ARP, length)
-        : generateArpChannel(progression, algos?.[CH_ARP] ?? null, role);
+        : makeArp(algos?.[CH_ARP] ?? null, progression, role);
       break;
     }
     case CH_PAD: {
@@ -732,7 +746,7 @@ export function applyChordsToPattern(
     pattern[CH_HARMONY] = makeHarmony(
       song.channelAlgos?.[CH_HARMONY] ?? null, song.config, pattern[CH_LEAD].slice(2), progression
     );
-    pattern[CH_ARP] = generateArpChannel(progression, song.channelAlgos?.[CH_ARP] ?? null, role);
+    pattern[CH_ARP] = makeArp(song.channelAlgos?.[CH_ARP] ?? null, progression, role);
   }
   pattern[CH_PAD] = generatePadChannel(progression, song.channelAlgos?.[CH_PAD] ?? null, role);
 
@@ -865,6 +879,10 @@ function expandSong(song: Song): ExpandedSong {
       if (!effects[ch]) continue;
       for (const fx of effects[ch]) {
         if (!fx) continue;
+        // Chance changes no instrument parameter, so it needs no variant
+        // channel. Giving it one would let its notes ring over each other
+        // instead of cutting off, quietly changing the mix.
+        if (fx.code === 'CN') continue;
         const key = `${ch}_${fx.code}_${fx.value}`;
         if (!effectKeys.has(key)) {
           effectKeys.set(key, { logicalCh: ch, effect: fx });
@@ -941,11 +959,13 @@ function expandSong(song: Song): ExpandedSong {
 
         const fx = channelEffects?.[row];
 
-        if (fx) {
-          const key = `${ch}_${fx.code}_${fx.value}`;
-          const physIdx = effectPhysMap.get(key)!;
-          const instIdx = effectInstMap.get(key)!;
-          physPattern[physIdx][0] = instIdx;
+        // CN has no variant channel (see above), so it stays on its own track
+        const physIdx = fx && fx.code !== 'CN'
+          ? effectPhysMap.get(`${ch}_${fx.code}_${fx.value}`)
+          : undefined;
+
+        if (fx && physIdx !== undefined) {
+          physPattern[physIdx][0] = effectInstMap.get(`${ch}_${fx.code}_${fx.value}`)!;
           physPattern[physIdx][row + 2] = note;
         } else {
           physPattern[ch][row + 2] = note;
@@ -1004,8 +1024,37 @@ export function songToZzfxm(song: Song): {
 }
 
 // Render song to 4 logical stereo channel buffers (for AudioGraph playback)
+/**
+ * Roll the dice for every note carrying a chance (CN) effect. This happens
+ * once per render, so each regeneration of the audio hears a different take —
+ * and on the Polyend the hardware's own Chance FX does the same thing per loop.
+ */
+function applyChanceRolls(song: Song): Song {
+  const labels = song.patternOrder.filter((label) =>
+    song.patternEffects?.[label]?.some((ch) => ch?.some((fx) => fx?.code === 'CN'))
+  );
+  if (labels.length === 0) return song;
+
+  const patterns = { ...song.patterns };
+  for (const label of labels) {
+    const effects = song.patternEffects[label];
+    const pattern = song.patterns[label].map((c) => [...c]) as Pattern;
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
+      const channelEffects = effects[ch];
+      if (!channelEffects) continue;
+      for (let row = 0; row < channelEffects.length; row++) {
+        const fx = channelEffects[row];
+        if (fx?.code !== 'CN') continue;
+        if (Math.random() * 100 >= fx.value) pattern[ch][row + 2] = 0;
+      }
+    }
+    patterns[label] = pattern;
+  }
+  return { ...song, patterns };
+}
+
 export function renderSongBuffers(song: Song): [number[], number[]][] {
-  const expanded = expandSong(song);
+  const expanded = expandSong(applyChanceRolls(song));
 
   // Humanize: zzfxm reads a note's fractional part as attenuation, so random
   // per-note velocity costs nothing — add a fraction to each integer note.

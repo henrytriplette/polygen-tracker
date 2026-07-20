@@ -38,7 +38,7 @@ const octave = ref(4);
 const gridEl = ref<HTMLElement | null>(null);
 
 // FX lane: number keys place effects with their default values
-const FX_KEY_CODES = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR'] as const;
+const FX_KEY_CODES = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR', 'CN'] as const;
 
 // FastTracker-style piano layout: bottom row = current octave, top row = +1.
 const PIANO_KEYS: Record<string, number> = {
@@ -380,7 +380,7 @@ function hasNote(ch: number, row: number): boolean {
       >SNAP:{{ state.snapToScale ? 'ON' : 'OFF' }}</button>
       <span class="edit-help">
         {{ cursor?.lane === 'fx'
-          ? '1-8 = SU SD VB DT ST PD BC TR · +/- value · DEL clear'
+          ? '1-9 = SU SD VB DT ST PD BC TR CN(chance) · +/- value · DEL clear'
           : 'Z-M / Q-U notes · 1/2/3 drums · +/- octave · DEL clear' }}
         · SHIFT+arrows select · CTRL+C/X/V · CTRL+↑↓ transpose (+SHIFT octave) · CTRL+A all
       </span>

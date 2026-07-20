@@ -72,6 +72,7 @@ export const FX_VALUES: Record<EffectCode, number> = {
   PD: 0x60,  // ~1 semitone pitch drop
   BC: 0x18,  // subtle crunch (~1575 Hz effective SR)
   TR: 0x46,  // ~5 Hz tremolo, moderate depth
+  CN: 50,    // coin-flip trigger chance (0-100, matching Polyend's Chance FX)
 };
 
 // Drums need a heavier pitch drop for audible thump
@@ -218,6 +219,7 @@ const EFFECT_POSITIONS: Record<EffectCode, PositionType[]> = {
   PD: ['phraseStart'],            // dramatic entrance
   BC: ['phraseStart'],            // crunch accent on downbeat
   TR: ['heldNote'],               // volume wobble on sustained notes
+  CN: ['heldNote'],               // never auto-placed; the user applies chance
 };
 
 // Each drum channel has one kind of hit now, so the preferred effect is

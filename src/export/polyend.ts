@@ -88,6 +88,10 @@ function mapEffect(effect: NoteEffect): FX | null {
       const depth = (v & 0xf) || 1;
       return { type: fxByName('Volume LFO'), value: Math.min(24, Math.max(1, Math.round((depth / 15) * 24))) };
     }
+    case 'CN':
+      // Chance maps exactly: both are a 0-100 trigger probability, so the
+      // hardware keeps re-rolling this note on every loop.
+      return { type: fxByName('Chance'), value: Math.max(0, Math.min(100, v)) };
     default:
       // DT (duty cycle) and PD (pitch drop) have no sample-based equivalent.
       return null;

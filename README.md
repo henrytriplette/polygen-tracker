@@ -60,12 +60,19 @@ Plus **M** (mute), **S** (solo), **↻** (regenerate this channel in this patter
 
 | Channel | Options |
 |---|---|
-| LEAD | WALK · ARP · RIFF · MARKOV · MARKOV-LEARN |
+| LEAD | WALK · ARP · RIFF · MARKOV · MARKOV-LEARN · L-SYSTEM · MOTIF |
 | HARM | GAPFILL · STABS · ARP · PEDAL |
-| BASS | GROOVE · ACID · ARP · OFFBEAT |
-| KICK/SNR/HAT | TEMPLATE · EUCLID · BREAK · 4-FLOOR |
-| ARP | UP-DOWN · OCTAVES · RANDOM |
+| BASS | GROOVE · ACID · ARP · OFFBEAT · POLYMETER |
+| KICK/SNR/HAT | TEMPLATE · EUCLID · BREAK · 4-FLOOR · AUTOMATA |
+| ARP | UP-DOWN · OCTAVES · RANDOM · POLYMETER |
 | PAD | SUSTAIN · SWELL · STAB |
+
+Four of these are worth explaining:
+
+- **L-SYSTEM** rewrites a short axiom with production rules until it fills the pattern. Every expansion contains scaled copies of what came before, so motifs recur at several time scales — which is what long patterns need, rather than an 8-row figure tiling sixteen times.
+- **MOTIF** states a short idea and then restates it *transformed*: transposed to each chord, inverted (intervals mirrored), retrograde (played backwards), augmented (thinned to half the hits). Theme-and-variation, so the line sounds composed rather than walked.
+- **POLYMETER** builds a figure of 5, 6, 7 or 9 rows and tiles it against the 4/4 drums, so it drifts and only realigns after several bars. Chord tones still follow the harmony under each hit, so it stays correct while the rhythm slips.
+- **AUTOMATA** runs a 1D cellular automaton (rules 90 / 110 / 18), one generation per row, tapping three bands of cells for kick, snare and hat. Hits fire on a *rising edge* so a live cell can't hold a drum down, kicks avoid odd 16ths, and per-drum density caps stop any rule producing a wall.
 
 The three drum channels share one kit generator, so changing any of them re-rolls the whole kit and keeps the parts rhythmically coherent.
 
@@ -101,6 +108,17 @@ Two of the LEAD algorithms replace template-based melody with a chain over scale
 
 > **Note:** MARKOV-LEARN only has something to learn from when regenerating a channel on an existing pattern. Pressing **GENERATE** builds patterns from scratch, so there is no prior lead and it falls back to the vibe's priors — behaving exactly like MARKOV. For an explicit "learn from this melody" action, use **RESAMPLE**.
 
+### Chance — generative on the hardware
+
+`CN` is an effect unlike the others: instead of changing the timbre, it is a
+0–100 probability that the note triggers at all. Place it with `9` in an FX
+column, or apply it across a selection.
+
+Playback re-rolls the dice on every render, so each listen is a different take.
+More importantly it maps **exactly** onto the Polyend's native **Chance FX** —
+so an exported project stays generative *on the device*, re-rolling every loop
+rather than freezing into one take.
+
 ### Mutate vs Resample
 
 Two different kinds of variation, both in the header:
@@ -119,7 +137,7 @@ Click any cell to place the cursor, then type:
 | `Z`–`M` | notes in the current octave (FastTracker layout) |
 | `Q`–`U` | one octave up |
 | `1` | place a hit (on a drum channel) |
-| `1`–`8` | place SU/SD/VB/DT/ST/PD/BC/TR (in an FX column) |
+| `1`–`9` | place SU/SD/VB/DT/ST/PD/BC/TR/CN (in an FX column) |
 | `+` / `-` | octave up/down — or FX value in an FX column |
 | `Del` | clear |
 | arrows | move the cursor across rows and columns |

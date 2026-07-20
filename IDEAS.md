@@ -46,12 +46,13 @@ Beginners can usually make a good 8-bar loop and then stall. This is where a gen
 
 Beyond the Markov chains already in place.
 
-- **Per-step chance** — Elektron-style trigger probability. The payoff here is unique: Polyend has a **native Chance FX**, so this exports losslessly and the *hardware itself* re-rolls every loop. The exported project stays generative on the device.
-- **L-system lead** — a short motif expanded by rewrite rules (transpose, mirror, subdivide) into self-similar long-form lines. The 64/128-row patterns are currently filled by tiling an 8-row figure; this would give them real long-form material.
-- **Cellular-automata drums** — Rule 90/110/30 evolving row by row, three cells mapped to kick/snare/hat, seeded from the vibe's template so bar 1 stays anchored. Excellent for IDM.
-- **Motif development** — deterministic theme-and-variation: restate the opening phrase inverted, retrograde, augmented, transposed. Very "composed"-sounding for the effort.
-- **Polymeter figures** — a 5- or 7-row bass loop against 4/4 drums. Trivial to generate, sounds instantly sophisticated, and teaches a genuinely useful tracker trick.
+- ~~**Per-step chance**~~ — *done.* `CN` effect, re-rolled per render and exported as the Polyend's native Chance FX, so the project stays generative on the device.
+- ~~**L-system lead**~~ — *done.*
+- ~~**Cellular-automata drums**~~ — *done*, using rules 90/110/18. Rules 30 and 150 were tried and dropped: they are chaotic enough that roughly half the cells are alive at any moment, so the taps fire on nearly every row and the "beat" is a wall.
+- ~~**Motif development**~~ — *done*, with transpose / invert / retrograde / augment.
+- ~~**Polymeter figures**~~ — *done*, on the bass and arp channels.
 - **Evolve** — spawn several mutations, audition, keep one, repeat. Selective breeding; MUTATE is already half of it.
+- **Chance on generation** — a global amount that sprinkles `CN` during generation, so beginners meet the feature without having to find the FX lane.
 
 ## 6. Sound design without the fear
 
@@ -82,9 +83,9 @@ Beyond the Markov chains already in place.
 For this specific user, in order:
 
 1. ~~Copy/paste + transpose~~ — **done**; cheap experimentation is how beginners learn.
-2. **Exported cheat-sheet** — smallest effort, lands at the exact moment of confusion.
-3. **Starter packs** — removes the blank page, and is a teaching artefact.
-4. **Per-step chance** — genuinely novel, and keeps the export alive on the hardware.
+2. ~~Per-step chance~~ — **done**; keeps the export alive on the hardware.
+3. **Exported cheat-sheet** — smallest effort, lands at the exact moment of confusion.
+4. **Starter packs** — removes the blank page, and is a teaching artefact.
 5. **Tension curve** — the arrangement lesson most people need after their first good loop.
 
 The through-line: this tool is at its best when it hands someone a finished-sounding track they didn't know how to make, then shows them which lever produced which part of it.
