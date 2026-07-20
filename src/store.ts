@@ -10,11 +10,14 @@ import {
   applyChannelSound,
   applyChordsToPattern,
   applySongStructure,
+  canResampleLead,
+  duplicatePatternInSong,
+  resampleLead,
   floatsToWav,
   generateSong,
   getRandomBpm,
   mutatePattern,
-  randomProgressionDegrees,
+  progressionDegreesFor,
   randomSeed,
   regenerateAllPatterns,
   regenerateChannel,
@@ -27,44 +30,82 @@ import {
   withSeed,
   zzfxP,
 } from './engine';
-import type { ChannelAlgos, NoteEffect, Pattern, PatternEffects } from './engine';
+import {
+  CHANNELS,
+  CHANNEL_COUNT,
+  DEFAULT_PATTERN_LENGTH,
+  DRUM_HIT_NOTE,
+  PATTERN_LENGTHS,
+  generateInstrumentForChannel,
+  isDrumChannel,
+} from './engine';
+import type { PatternLength } from './engine';
+
+export { PATTERN_LENGTHS };
+import type { ChannelAlgos, ChordMode, NoteEffect, Pattern, PatternEffects } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
 
 // Selectable timbre palette per channel (re-exported from the engine so the
 // grid can render it next to the vibe/algo pickers). null = AUTO.
 export { CHANNEL_SOUND_OPTIONS } from './engine';
 
-// Selectable pattern algorithms per channel (null = AUTO, the vibe default)
+// Selectable pattern algorithms per channel (null = AUTO, the vibe default).
+// The three drum channels share one kit generator, so they share its options.
+const LEAD_ALGOS = [
+  { value: 'walk', label: 'WALK' },
+  { value: 'arp', label: 'ARP' },
+  { value: 'riff', label: 'RIFF' },
+  { value: 'markov', label: 'MARKOV' },
+  { value: 'markovLearn', label: 'MARKOV-LEARN' },
+  { value: 'lsystem', label: 'L-SYSTEM' },
+  { value: 'motif', label: 'MOTIF' },
+];
+const HARMONY_ALGOS = [
+  { value: 'gapfill', label: 'GAPFILL' },
+  { value: 'stabs', label: 'STABS' },
+  { value: 'arp', label: 'ARP' },
+  { value: 'pedal', label: 'PEDAL' },
+];
+const BASS_ALGOS = [
+  { value: 'groove', label: 'GROOVE' },
+  { value: 'acid', label: 'ACID' },
+  { value: 'arp', label: 'ARP' },
+  { value: 'offbeat', label: 'OFFBEAT' },
+  { value: 'poly', label: 'POLYMETER' },
+];
+const DRUM_ALGOS = [
+  { value: 'template', label: 'TEMPLATE' },
+  { value: 'euclid', label: 'EUCLID' },
+  { value: 'break', label: 'BREAK' },
+  { value: 'four', label: '4-FLOOR' },
+  { value: 'automata', label: 'AUTOMATA' },
+];
+const ARP_ALGOS = [
+  { value: 'updown', label: 'UP-DOWN' },
+  { value: 'octaves', label: 'OCTAVES' },
+  { value: 'random', label: 'RANDOM' },
+  { value: 'poly', label: 'POLYMETER' },
+];
+const PAD_ALGOS = [
+  { value: 'sustain', label: 'SUSTAIN' },
+  { value: 'swell', label: 'SWELL' },
+  { value: 'stab', label: 'STAB' },
+];
+
 export const CHANNEL_ALGO_OPTIONS: { value: string; label: string }[][] = [
-  [
-    { value: 'walk', label: 'WALK' },
-    { value: 'arp', label: 'ARP' },
-    { value: 'riff', label: 'RIFF' },
-  ],
-  [
-    { value: 'gapfill', label: 'GAPFILL' },
-    { value: 'stabs', label: 'STABS' },
-    { value: 'arp', label: 'ARP' },
-    { value: 'pedal', label: 'PEDAL' },
-  ],
-  [
-    { value: 'groove', label: 'GROOVE' },
-    { value: 'acid', label: 'ACID' },
-    { value: 'arp', label: 'ARP' },
-    { value: 'offbeat', label: 'OFFBEAT' },
-  ],
-  [
-    { value: 'template', label: 'TEMPLATE' },
-    { value: 'euclid', label: 'EUCLID' },
-    { value: 'break', label: 'BREAK' },
-    { value: 'four', label: '4-FLOOR' },
-  ],
+  LEAD_ALGOS,
+  HARMONY_ALGOS,
+  BASS_ALGOS,
+  DRUM_ALGOS, // kick
+  DRUM_ALGOS, // snare
+  DRUM_ALGOS, // hat
+  ARP_ALGOS,
+  PAD_ALGOS,
 ];
 import { downloadPolyendPatterns, downloadPolyendProject, sanitizeProjectName } from './export/polyend';
 import { buildMidiFile } from './export/midi';
 import { songFromHash, songToHash } from './share';
 import { Tracker } from './lib/polyend';
-import { DRUM_NOTES } from './engine';
 import {
   deleteProject,
   listProjects,
@@ -76,7 +117,7 @@ import {
   type SavedProject,
 } from './persist';
 
-export const CHANNEL_LABELS = ['LEAD', 'HARM', 'BASS', 'DRUM'] as const;
+export const CHANNEL_LABELS = CHANNELS.map((c) => c.label);
 
 export interface VibeOption {
   value: VibeName;
@@ -140,6 +181,10 @@ interface StoreState {
   lastSeed: number | null;
   follow: boolean;
   shareStatus: '' | 'copied' | 'failed';
+  /** Channel the instrument panel should follow (set by the grid cursor). */
+  instrumentChannel: number | null;
+  /** Whether a block has been copied (drives the paste hint in the edit bar). */
+  hasClipboard: boolean;
 }
 
 const initialSong = loadCurrent() ?? generateSong();
@@ -150,7 +195,7 @@ const state = reactive<StoreState>({
   isPlaying: false,
   playSeqIdx: 0,
   playRow: -1,
-  muted: [false, false, false, false],
+  muted: Array(CHANNEL_COUNT).fill(false),
   solo: null,
   exportDevice: 12,
   isExporting: false,
@@ -162,6 +207,8 @@ const state = reactive<StoreState>({
   lastSeed: null,
   follow: false,
   shareStatus: '',
+  instrumentChannel: null,
+  hasClipboard: false,
 });
 
 // --- History + autosave ------------------------------------------------------
@@ -207,9 +254,55 @@ function renderBuffers(song: Song): { buffers: [number[], number[]][]; duration:
   return { buffers, duration };
 }
 
+/** Rows in this song's patterns (older songs are 32). */
+function patternRows(): number {
+  const first = state.song.patterns[state.song.patternOrder[0]];
+  return Math.max(1, (first?.[0]?.length ?? 34) - 2);
+}
+
+// --- Block editing -----------------------------------------------------------
+
+/** An inclusive rectangle of the grid: channels × rows. */
+export interface BlockRect {
+  chStart: number;
+  chEnd: number;
+  rowStart: number;
+  rowEnd: number;
+}
+
+interface ClipBlock {
+  width: number;
+  height: number;
+  notes: number[][];
+  fx: (NoteEffect | null)[][];
+}
+
+let clipboard: ClipBlock | null = null;
+
+/** Mutable copies of the selected pattern's notes and effects. */
+function editablePattern() {
+  const label = state.selectedPattern;
+  const rows = patternRows();
+  const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
+  const existing = state.song.patternEffects?.[label];
+  const effects = Array.from({ length: CHANNEL_COUNT }, (_, ch) => [
+    ...(existing?.[ch] ?? Array(rows).fill(null)),
+  ]) as PatternEffects;
+  return { label, rows, pattern, effects };
+}
+
+function commitPattern(label: PatternLabel, pattern: Pattern, effects: PatternEffects): void {
+  state.song = {
+    ...state.song,
+    patterns: { ...state.song.patterns, [label]: pattern },
+    patternEffects: { ...state.song.patternEffects, [label]: effects },
+  };
+  swapAudio();
+}
+
 function applyGains(): void {
   if (!graph) return;
-  for (let ch = 0; ch < 4; ch++) {
+  for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
     const audible = state.solo !== null ? state.solo === ch : !state.muted[ch];
     graph.setChannelGain(ch, audible ? 1 : 0);
   }
@@ -220,10 +313,11 @@ function tickPlayhead(): void {
   const pos = graph.getPosition();
   const rowDuration = 60 / graph.bpm / 4;
   // The zzfxm renderer drops the very first beat, so position 0 is row 1.
-  const totalRows = state.song.sequence.length * 32 - 1;
+  const rows = patternRows();
+  const totalRows = state.song.sequence.length * rows - 1;
   const globalRow = (Math.floor(pos / rowDuration) + 1) % (totalRows + 1);
-  state.playSeqIdx = Math.min(Math.floor(globalRow / 32), state.song.sequence.length - 1);
-  state.playRow = globalRow % 32;
+  state.playSeqIdx = Math.min(Math.floor(globalRow / rows), state.song.sequence.length - 1);
+  state.playRow = globalRow % rows;
   if (state.follow) {
     const playing = state.song.patternOrder[state.song.sequence[state.playSeqIdx]];
     if (playing && playing !== state.selectedPattern) state.selectedPattern = playing;
@@ -249,11 +343,24 @@ function afterSongChange(): void {
   swapAudio();
 }
 
+/**
+ * Carry locked instruments (and their lock flags) from the previous song into
+ * a freshly generated one, so a pinned sound survives GENERATE / vibe changes.
+ */
+function keepLockedInstruments(next: Song, previous: Song): Song {
+  const locked = previous.lockedInstruments;
+  if (!locked?.some(Boolean)) return next;
+  const instruments = next.instruments.map((inst, ch) =>
+    locked[ch] && previous.instruments[ch] ? [...previous.instruments[ch]] : inst
+  );
+  return { ...next, instruments, lockedInstruments: [...locked] };
+}
+
 export const store = {
   state,
 
   channelColor(ch: number): string {
-    return ['var(--ch-lead)', 'var(--ch-harmony)', 'var(--ch-bass)', 'var(--ch-drums)'][ch];
+    return `var(--ch-${CHANNELS[ch]?.id ?? 'lead'})`;
   },
 
   getAnalyser(): AnalyserNode | null {
@@ -307,17 +414,35 @@ export const store = {
     const parsed = Number.parseInt(state.seedInput.trim(), 10);
     const seed = Number.isFinite(parsed) && state.seedInput.trim() !== '' ? parsed >>> 0 : randomSeed();
     state.lastSeed = seed;
-    state.song = withSeed(seed, () =>
+    const previous = state.song;
+    const generated = withSeed(seed, () =>
       generateSong(
-        { vibe: state.song.config.vibe, length: state.song.config.length },
-        state.song.channelVibes,
-        state.song.channelAlgos,
-        state.song.structureId,
-        state.song.channelSounds
+        { vibe: previous.config.vibe, length: previous.config.length },
+        previous.channelVibes,
+        previous.channelAlgos,
+        previous.structureId,
+        previous.channelSounds
       )
     );
+    state.song = keepLockedInstruments(generated, previous);
     state.selectedPattern = state.song.patternOrder[0];
     afterSongChange();
+  },
+
+  /** True when the selected pattern's lead has enough notes to learn from. */
+  canResample(): boolean {
+    return canResampleLead(state.song, state.selectedPattern);
+  },
+
+  /**
+   * Learn the current lead's melodic dialect and write a new lead from it —
+   * a variation in the same voice, rather than a fresh idea.
+   */
+  resampleLead(): void {
+    const next = resampleLead(state.song, state.selectedPattern);
+    if (next === state.song) return;
+    state.song = next;
+    swapAudio();
   },
 
   mutate(): void {
@@ -338,7 +463,7 @@ export const store = {
 
   setVibe(vibe: VibeName): void {
     if (vibe === state.song.config.vibe) return;
-    state.song = regenerateForVibe(state.song, vibe);
+    state.song = keepLockedInstruments(regenerateForVibe(state.song, vibe), state.song);
     afterSongChange();
   },
 
@@ -352,9 +477,23 @@ export const store = {
     afterSongChange();
   },
 
+  /** Change rows per pattern; regenerates every pattern at the new length. */
+  setPatternLength(rows: PatternLength): void {
+    if (rows === (state.song.config.patternLength ?? DEFAULT_PATTERN_LENGTH)) return;
+    const withLength: Song = {
+      ...state.song,
+      config: { ...state.song.config, patternLength: rows },
+    };
+    state.song = keepLockedInstruments(
+      regenerateAllPatterns(withLength, { patternLength: rows }),
+      state.song
+    );
+    afterSongChange();
+  },
+
   setLength(length: SongLength): void {
     if (length === state.song.config.length) return;
-    state.song = regenerateWithNewLength(state.song, length);
+    state.song = keepLockedInstruments(regenerateWithNewLength(state.song, length), state.song);
     afterSongChange();
   },
 
@@ -412,6 +551,18 @@ export const store = {
     swapAudio();
   },
 
+  /** Clone the selected pattern into a new slot and append it to the song. */
+  duplicatePattern(): void {
+    const before = state.song.patternOrder.length;
+    let next = duplicatePatternInSong(state.song, state.selectedPattern);
+    if (next.patternOrder.length === before) return; // already at 8
+    const newIdx = next.patternOrder.length - 1;
+    next = { ...next, sequence: [...next.sequence, newIdx] };
+    state.song = next;
+    state.selectedPattern = next.patternOrder[newIdx];
+    swapAudio();
+  },
+
   addPattern(): void {
     const before = state.song.patternOrder.length;
     let next = addPatternToSong(state.song);
@@ -451,9 +602,14 @@ export const store = {
 
   rollChords(): void {
     const vibe = state.song.channelVibes?.[1] ?? state.song.config.vibe;
-    const degrees = randomProgressionDegrees(vibe);
+    const degrees = progressionDegreesFor(vibe, state.song.chordMode);
     state.song = applyChordsToPattern(state.song, state.selectedPattern, degrees);
     swapAudio();
+  },
+
+  /** Curated progression pools, or a walk of the vibe's harmonic chain. */
+  setChordMode(mode: ChordMode): void {
+    state.song = { ...state.song, chordMode: mode };
   },
 
   toggleSnap(): void {
@@ -467,7 +623,7 @@ export const store = {
   },
 
   setChannelVibe(ch: number, vibe: VibeName | null): void {
-    state.song = applyChannelVibe(state.song, ch, vibe);
+    state.song = keepLockedInstruments(applyChannelVibe(state.song, ch, vibe), state.song);
     swapAudio();
   },
 
@@ -481,12 +637,130 @@ export const store = {
     swapAudio();
   },
 
+  // --- Block editing (copy / paste / clear / transpose) ---
+
+  /** Copy a rectangle of notes+effects out of the selected pattern. */
+  copyBlock(block: BlockRect): void {
+    const label = state.selectedPattern;
+    const pattern = state.song.patterns[label];
+    const effects = state.song.patternEffects?.[label];
+    const rows = patternRows();
+
+    const notes: number[][] = [];
+    const fx: (NoteEffect | null)[][] = [];
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      const noteCol: number[] = [];
+      const fxCol: (NoteEffect | null)[] = [];
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        noteCol.push(pattern[ch]?.[row + 2] ?? 0);
+        fxCol.push(effects?.[ch]?.[row] ?? null);
+      }
+      notes.push(noteCol);
+      fx.push(fxCol);
+    }
+
+    clipboard = {
+      width: block.chEnd - block.chStart + 1,
+      height: Math.min(block.rowEnd, rows - 1) - block.rowStart + 1,
+      notes,
+      fx,
+    };
+    state.hasClipboard = true;
+  },
+
+  /** Blank the notes and effects inside a rectangle. */
+  clearBlock(block: BlockRect): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        pattern[ch][row + 2] = 0;
+        effects[ch][row] = null;
+      }
+    }
+    commitPattern(label, pattern, effects);
+  },
+
+  cutBlock(block: BlockRect): void {
+    this.copyBlock(block);
+    this.clearBlock(block);
+  },
+
+  /** Paste the clipboard with its top-left corner at (ch, row). */
+  pasteBlock(ch: number, row: number): void {
+    if (!clipboard) return;
+    const { pattern, effects, label, rows } = editablePattern();
+
+    for (let c = 0; c < clipboard.width; c++) {
+      const targetCh = ch + c;
+      if (targetCh >= CHANNEL_COUNT) break;
+      for (let r = 0; r < clipboard.height; r++) {
+        const targetRow = row + r;
+        if (targetRow >= rows) break;
+        const note = clipboard.notes[c]?.[r] ?? 0;
+        // A pitched note pasted onto a drum channel (or vice versa) is
+        // meaningless, so normalise it to that channel's own convention.
+        pattern[targetCh][targetRow + 2] = note > 0 && isDrumChannel(targetCh)
+          ? DRUM_HIT_NOTE
+          : note;
+        effects[targetCh][targetRow] = clipboard.fx[c]?.[r] ?? null;
+      }
+    }
+    commitPattern(label, pattern, effects);
+  },
+
+  /**
+   * Give every note in a rectangle a trigger probability. Playback re-rolls
+   * it each render, and it exports as the Polyend's native Chance FX so the
+   * hardware keeps re-rolling too. 0 removes it.
+   */
+  setBlockChance(block: BlockRect, percent: number): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    let touched = 0;
+
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        if (pattern[ch][row + 2] <= 0) continue; // only notes can be chanced
+        const existing = effects[ch][row];
+        if (value === 0) {
+          if (existing?.code === 'CN') effects[ch][row] = null;
+        } else {
+          effects[ch][row] = { code: 'CN', value };
+        }
+        touched++;
+      }
+    }
+    if (touched === 0) return;
+    commitPattern(label, pattern, effects);
+  },
+
+  /** Shift every pitched note in a rectangle by N semitones. */
+  transposeBlock(block: BlockRect, semitones: number): void {
+    const { pattern, effects, label, rows } = editablePattern();
+    let moved = 0;
+
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      // Drum channels have one fixed hit note — transposing them is meaningless
+      if (isDrumChannel(ch)) continue;
+      for (let row = block.rowStart; row <= block.rowEnd && row < rows; row++) {
+        const note = pattern[ch][row + 2];
+        if (note <= 0) continue;
+        pattern[ch][row + 2] = Math.max(1, Math.min(48, note + semitones));
+        moved++;
+      }
+    }
+    if (moved === 0) return;
+    commitPattern(label, pattern, effects);
+  },
+
   /** Write or clear one step effect in the selected pattern. */
   setEffect(ch: number, row: number, effect: NoteEffect | null): void {
+    if (ch < 0 || ch >= CHANNEL_COUNT || row < 0 || row >= patternRows()) return;
     const label = state.selectedPattern;
     const existing = state.song.patternEffects?.[label];
-    const effects = [0, 1, 2, 3].map((c) => [
-      ...(existing?.[c] ?? Array(32).fill(null)),
+    const rows = patternRows();
+    const effects = Array.from({ length: CHANNEL_COUNT }, (_, c) => [
+      ...(existing?.[c] ?? Array(rows).fill(null)),
     ]) as PatternEffects;
     effects[ch][row] = effect;
     state.song = {
@@ -498,6 +772,9 @@ export const store = {
 
   /** Write one note (0 = clear) into the selected pattern. */
   setNote(ch: number, row: number, note: number): void {
+    // Guard the bounds here, not just in the UI: writing past the end would
+    // silently extend one channel and leave the pattern ragged.
+    if (ch < 0 || ch >= CHANNEL_COUNT || row < 0 || row >= patternRows()) return;
     const label = state.selectedPattern;
     const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
     pattern[ch][row + 2] = note;
@@ -515,6 +792,48 @@ export const store = {
     params[2] = (params[2] ?? 0) * 2 ** ((note - 12) / 12);
     const samples = ZZFX.buildSamples(...params);
     zzfxP([samples], 0.6);
+  },
+
+  // --- Instrument editing ---
+
+  /** Audition a channel's instrument at its base pitch. */
+  previewInstrument(ch: number): void {
+    const params = state.song.instruments[ch];
+    if (!params) return;
+    zzfxP([ZZFX.buildSamples(...params)], 0.7);
+  },
+
+  setInstrumentParam(ch: number, index: number, value: number): void {
+    const instruments = state.song.instruments.map((inst, i) =>
+      i === ch ? [...inst] : inst
+    );
+    if (!instruments[ch]) return;
+    instruments[ch][index] = value;
+    state.song = { ...state.song, instruments };
+    swapAudio();
+    this.previewInstrument(ch);
+  },
+
+  /** New random timbre for one channel; notes and everything else stay. */
+  rerollInstrument(ch: number): void {
+    const vibe = state.song.channelVibes?.[ch] ?? state.song.config.vibe;
+    const sound = state.song.channelSounds?.[ch] ?? null;
+    const instruments = [...state.song.instruments];
+    instruments[ch] = generateInstrumentForChannel(vibe, ch, sound);
+    state.song = { ...state.song, instruments };
+    swapAudio();
+    this.previewInstrument(ch);
+  },
+
+  isInstrumentLocked(ch: number): boolean {
+    return state.song.lockedInstruments?.[ch] ?? false;
+  },
+
+  /** Locked instruments survive GENERATE and vibe changes. */
+  toggleInstrumentLock(ch: number): void {
+    const locked = [...(state.song.lockedInstruments ?? Array(CHANNEL_COUNT).fill(false))];
+    locked[ch] = !locked[ch];
+    state.song = { ...state.song, lockedInstruments: locked };
   },
 
   regenChannel(ch: number): void {
@@ -636,21 +955,19 @@ export const store = {
     const label = state.selectedPattern;
     const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
 
-    for (let ch = 0; ch < 4; ch++) {
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
       const track = parsed.tracks[ch];
-      for (let row = 0; row < 32; row++) {
+      const rows = patternRows();
+      for (let row = 0; row < rows; row++) {
         const step = track?.steps[row];
         if (!step || step.note < 0) {
           pattern[ch][row + 2] = 0;
           continue;
         }
-        if (ch === 3) {
-          const inst = step.instrument;
-          pattern[ch][row + 2] =
-            inst <= 3 ? DRUM_NOTES.KICK : inst === 4 ? DRUM_NOTES.SNARE : DRUM_NOTES.HAT;
-        } else {
-          pattern[ch][row + 2] = Math.max(1, Math.min(48, step.note - 36));
-        }
+        // Tracks map 1:1 to channels now, so drums are just "hit or not".
+        pattern[ch][row + 2] = isDrumChannel(ch)
+          ? DRUM_HIT_NOTE
+          : Math.max(1, Math.min(48, step.note - 36));
       }
     }
 
@@ -680,9 +997,9 @@ export const store = {
       const { buffers } = renderBuffers(state.song);
       if (!buffers.length) return;
       const zip = new JSZip();
-      const names = ['lead', 'harmony', 'bass', 'drums'];
       buffers.forEach(([l, r], ch) => {
-        zip.file(`${names[ch]}.wav`, floatsToWav(l, r));
+        const name = CHANNELS[ch]?.id ?? `ch${ch + 1}`;
+        zip.file(`${ch + 1}-${name}.wav`, floatsToWav(l, r));
       });
       const blob = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');

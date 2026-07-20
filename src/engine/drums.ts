@@ -1,7 +1,12 @@
-import { VibeName, ChannelData, DRUM_NOTES } from './types';
+import {
+  VibeName, ChannelData, DRUM_HIT_NOTE, CH_KICK, CH_SNARE, CH_HAT,
+  DEFAULT_PATTERN_LENGTH, DRUM_PERIOD,
+} from './types';
 import { euclidean } from './euclidean';
 
-const ROWS = 32;
+// Drum templates are written across one DRUM_PERIOD block and tile to fill
+// whatever the pattern length is, so the groove keeps its period.
+const ROWS = DRUM_PERIOD;
 
 // Key insight from SynthyCraft: drums should be TEMPLATE-DRIVEN with minimal randomness.
 // The kick is the backbone and should be predictable. Snare has weighted options.
@@ -203,8 +208,9 @@ function generateSnareHits(vibe: VibeName): number[] {
   return hits;
 }
 
-// Hats: gap-filling reactive logic (SynthyCraft technique)
-// Only play where kick AND snare are silent. Prefer even-numbered steps.
+// Hats ride the eighth-note grid. They have their own channel now, so they
+// can sound on top of kicks and snares like a real kit; rows shared with
+// another drum are just slightly less likely, keeping the gap-filling feel.
 function generateHatHits(
   kickHits: Set<number>,
   snareHits: Set<number>,
@@ -212,9 +218,9 @@ function generateHatHits(
 ): number[] {
   const hits: number[] = [];
   for (let i = 0; i < ROWS; i++) {
-    if (kickHits.has(i) || snareHits.has(i)) continue;
-    // Prefer every-other-step pattern (even steps), with density controlling probability
-    if (i % 2 === 0 && Math.random() < density) {
+    if (i % 2 !== 0) continue; // every-other-step grid
+    const shared = kickHits.has(i) || snareHits.has(i);
+    if (Math.random() < (shared ? density * 0.7 : density)) {
       hits.push(i);
     }
   }
@@ -239,10 +245,34 @@ const HAT_DENSITY: Record<VibeName, number> = {
   dnb: 0.65,
 };
 
-export function generateDrumPattern(vibe: VibeName): {
-  channelData: ChannelData;
+export interface DrumChannels {
+  /** One ChannelData per drum channel: kick, snare, hat. */
+  channels: ChannelData[];
+  /** 1 where a kick lands — used to sync the bass. */
   kickPattern: number[];
-} {
+}
+
+/**
+ * Turn a set of hit rows (within one DRUM_PERIOD block) into ChannelData,
+ * tiling the block across the full pattern length.
+ */
+export function drumChannelFromHits(
+  hits: Set<number> | number[],
+  channelIndex: number,
+  length: number = DEFAULT_PATTERN_LENGTH
+): ChannelData {
+  const set = hits instanceof Set ? hits : new Set(hits);
+  const notes: number[] = Array(length).fill(0);
+  for (let i = 0; i < length; i++) {
+    if (set.has(i % DRUM_PERIOD)) notes[i] = DRUM_HIT_NOTE;
+  }
+  return [channelIndex, 0, ...notes];
+}
+
+export function generateDrumPattern(
+  vibe: VibeName,
+  length: number = DEFAULT_PATTERN_LENGTH
+): DrumChannels {
   const kickTemplate = KICK_TEMPLATES[vibe];
 
   // Build kick hits from template + optional ghosts
@@ -254,29 +284,24 @@ export function generateDrumPattern(vibe: VibeName): {
   }
 
   // Build snare hits from weighted templates
-  const snarePositions = generateSnareHits(vibe);
-  const snareHits = new Set(snarePositions);
+  const snareHits = new Set(generateSnareHits(vibe));
 
-  // Build hat hits (gap-filling)
-  const hatPositions = generateHatHits(kickHits, snareHits, HAT_DENSITY[vibe]);
+  // Build hat hits (gap-filling). Hats may now overlap kicks and snares,
+  // since every drum has its own channel.
+  const hatHits = new Set(generateHatHits(kickHits, snareHits, HAT_DENSITY[vibe]));
 
-  // Merge into single channel: kick > snare > hat priority
-  const notes: number[] = Array(ROWS).fill(0);
-  const kickArray: number[] = Array(ROWS).fill(0);
-
-  for (let i = 0; i < ROWS; i++) {
-    if (kickHits.has(i)) {
-      notes[i] = DRUM_NOTES.KICK;
-      kickArray[i] = 1;
-    } else if (snareHits.has(i)) {
-      notes[i] = DRUM_NOTES.SNARE;
-    } else if (hatPositions.includes(i)) {
-      notes[i] = DRUM_NOTES.HAT;
-    }
+  // Kick map spans the full pattern so the bass can sync against every bar
+  const kickArray: number[] = Array(length).fill(0);
+  for (let row = 0; row < length; row++) {
+    if (kickHits.has(row % DRUM_PERIOD)) kickArray[row] = 1;
   }
 
   return {
-    channelData: [3, 0, ...notes],
+    channels: [
+      drumChannelFromHits(kickHits, CH_KICK, length),
+      drumChannelFromHits(snareHits, CH_SNARE, length),
+      drumChannelFromHits(hatHits, CH_HAT, length),
+    ],
     kickPattern: kickArray,
   };
 }

@@ -57,6 +57,12 @@ function labelAt(seqIdx: number): PatternLabel {
         title="Add a new generated pattern (also appended to the song chain)"
         @click="store.addPattern()"
       >+PAT</button>
+      <button
+        v-if="state.song.patternOrder.length < 8"
+        class="seq-slot add"
+        title="Duplicate the selected pattern into a new slot — edit the copy without losing the original"
+        @click="store.duplicatePattern()"
+      >⧉ DUP</button>
     </div>
   </div>
 </template>

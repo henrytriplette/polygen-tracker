@@ -11,6 +11,7 @@
 // note byte 48 is C4 (MIDI 60), so: polyendNote = zzfxmNote + 36.
 import JSZip from 'jszip';
 import { ZZFX } from '../engine/zzfx';
+import { CHANNEL_COUNT, isDrumChannel } from '../engine/types';
 import type { Song, NoteEffect } from '../engine/types';
 import {
   AudioUtil,
@@ -26,7 +27,7 @@ import {
 
 export interface PolyendExportOptions {
   /**
-   * Pattern file track slots (the generated song always uses tracks 1-4):
+   * Pattern file track slots (the song fills all 8 audio tracks):
    * - 8  = original Tracker on firmware <= 1.8 (8 audio tracks)
    * - 12 = original Tracker on firmware 1.9+ (8 audio + 4 MIDI) — default
    * - 16 = Tracker+ / Mini (8 audio + 8 MIDI)
@@ -34,19 +35,12 @@ export interface PolyendExportOptions {
   trackCount?: 8 | 12 | 16;
 }
 
-const ROWS = 32;
+
 const ZZFXM_TO_POLYEND = 36; // zzfxm note 12 (C4) -> Polyend note byte 48 (C4)
 const POLYEND_C4 = 48;
 
-// Drum channel notes are pitch variations of one noise instrument; export
-// them as three dedicated samples so the hardware plays them faithfully.
-const DRUM_SPLITS = [
-  { name: 'Kick', zzfxmNote: 1, maxNote: 6 },
-  { name: 'Snare', zzfxmNote: 14, maxNote: 22 },
-  { name: 'Hat', zzfxmNote: 32, maxNote: Infinity },
-] as const;
-
-const CHANNEL_NAMES = ['Lead', 'Harmony', 'Bass'] as const;
+// Channels map 1:1 onto the Polyend's audio tracks and instrument slots.
+const CHANNEL_EXPORT_NAMES = ['Lead', 'Harmony', 'Bass', 'Kick', 'Snare', 'Hat', 'Arp', 'Pad'];
 
 function renderInstrumentWav(params: number[], zzfxmNote: number): ArrayBuffer {
   const p = [...params];
@@ -94,15 +88,16 @@ function mapEffect(effect: NoteEffect): FX | null {
       const depth = (v & 0xf) || 1;
       return { type: fxByName('Volume LFO'), value: Math.min(24, Math.max(1, Math.round((depth / 15) * 24))) };
     }
+    case 'CN':
+      // Chance maps exactly: both are a 0-100 trigger probability, so the
+      // hardware keeps re-rolling this note on every loop.
+      return { type: fxByName('Chance'), value: Math.max(0, Math.min(100, v)) };
     default:
       // DT (duty cycle) and PD (pitch drop) have no sample-based equivalent.
       return null;
   }
 }
 
-function drumSplitIndex(zzfxmNote: number): number {
-  return DRUM_SPLITS.findIndex((d) => zzfxmNote <= d.maxNote);
-}
 
 function setStep(step: StepData, note: number, instrument: number, effect: NoteEffect | null | undefined): void {
   step.note = Math.max(0, Math.min(127, note));
@@ -124,14 +119,17 @@ export function buildPatternData(
 ): ReturnType<typeof Tracker.createPattern> {
   const source = song.patterns[label];
   const effects = song.patternEffects?.[label];
+  const ROWS = Math.max(1, (source[0]?.length ?? 34) - 2);
   const pattern = Tracker.createPattern(trackCount, ROWS);
 
   const swing = Math.max(0, Math.min(30, song.config.swing ?? 0));
   const humanize = Math.max(0, Math.min(30, song.config.humanize ?? 0));
   const noneFx = PatternFX[0]!;
 
-  for (let ch = 0; ch < 4; ch++) {
+  const channels = Math.min(CHANNEL_COUNT, trackCount);
+  for (let ch = 0; ch < channels; ch++) {
     const channelData = source[ch];
+    if (!channelData) continue;
     const channelEffects = effects?.[ch];
     const track = pattern.tracks[ch];
 
@@ -141,12 +139,9 @@ export function buildPatternData(
       const step = track.steps[row];
       const effect = channelEffects?.[row] ?? null;
 
-      if (ch === 3) {
-        const split = drumSplitIndex(note);
-        setStep(step, POLYEND_C4, 3 + split, effect);
-      } else {
-        setStep(step, note + ZZFXM_TO_POLYEND, ch, effect);
-      }
+      // Drums are one-shot samples: always trigger at the sample's base pitch.
+      const polyendNote = isDrumChannel(ch) ? POLYEND_C4 : note + ZZFXM_TO_POLYEND;
+      setStep(step, polyendNote, ch, effect);
 
       // Groove FX in whichever step-FX slots remain free:
       // swing = Micro-move on odd 16ths, humanize = randomized Volume.
@@ -186,29 +181,19 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   const zip = new JSZip();
 
   // --- Instruments ------------------------------------------------------
-  // 0..2 = lead/harmony/bass rendered at base pitch, 3..5 = kick/snare/hat.
-  const instrumentFiles: { filename: string; buffer: ArrayBuffer }[] = [];
-
-  CHANNEL_NAMES.forEach((name, i) => {
-    const wav = renderInstrumentWav(song.instruments[i], 12);
+  // One .pti per channel, rendered at its base pitch; the hardware repitches
+  // melodic samples from the note column and plays drums one-shot.
+  CHANNEL_EXPORT_NAMES.forEach((name, ch) => {
+    const params = song.instruments[ch];
+    if (!params) return;
+    const wav = renderInstrumentWav(params, 12);
     const inst = Tracker.createInstrument(wav);
     inst.sample.filename = name;
-    instrumentFiles.push({ filename: `${String(i + 1).padStart(2, '0')} ${name}.pti`, buffer: Instrument.write(inst) });
+    zip.file(
+      `instruments/${String(ch + 1).padStart(2, '0')} ${name}.pti`,
+      Instrument.write(inst)
+    );
   });
-
-  DRUM_SPLITS.forEach((split, i) => {
-    const wav = renderInstrumentWav(song.instruments[3], split.zzfxmNote);
-    const inst = Tracker.createInstrument(wav);
-    inst.sample.filename = split.name;
-    instrumentFiles.push({
-      filename: `${String(i + 4).padStart(2, '0')} ${split.name}.pti`,
-      buffer: Instrument.write(inst),
-    });
-  });
-
-  for (const file of instrumentFiles) {
-    zip.file(`instruments/${file.filename}`, file.buffer);
-  }
 
   // --- Patterns ---------------------------------------------------------
   const patternNames: string[] = [];
@@ -226,11 +211,8 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   const project = Tracker.createProject(song.config.name || 'polygen');
   project.values.globalTempo = song.config.bpm;
   project.values.trackNames = [
-    'Lead',
-    'Harmony',
-    'Bass',
-    'Drums',
-    ...project.values.trackNames.slice(4),
+    ...CHANNEL_EXPORT_NAMES,
+    ...project.values.trackNames.slice(CHANNEL_EXPORT_NAMES.length),
   ];
 
   const playlist = new Array(project.song.playlist.length).fill(0);

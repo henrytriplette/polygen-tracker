@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
-import { store, VIBE_GROUPS } from './store';
+import { store, PATTERN_LENGTHS, VIBE_GROUPS } from './store';
 import { CHROMATIC, STRUCTURE_OPTIONS } from './engine';
-import type { NoteName, ScaleName, SongLength, VibeName } from './engine';
+import type { NoteName, PatternLength, ScaleName, SongLength, VibeName } from './engine';
 import ChordBar from './components/ChordBar.vue';
+import InstrumentPanel from './components/InstrumentPanel.vue';
 import Oscilloscope from './components/Oscilloscope.vue';
 import SequenceBar from './components/SequenceBar.vue';
 import TrackerGrid from './components/TrackerGrid.vue';
@@ -12,6 +13,9 @@ const state = store.state;
 
 function onVibe(e: Event) {
   store.setVibe((e.target as HTMLSelectElement).value as VibeName);
+}
+function onPatternLength(e: Event) {
+  store.setPatternLength(Number((e.target as HTMLSelectElement).value) as PatternLength);
 }
 function onStructure(e: Event) {
   const value = (e.target as HTMLSelectElement).value;
@@ -114,6 +118,14 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
       <button class="btn" :disabled="!state.undoCount" title="Undo (Ctrl+Z)" @click="store.undo()">↶</button>
       <button class="btn" :disabled="!state.redoCount" title="Redo (Ctrl+Y)" @click="store.redo()">↷</button>
       <button class="btn" title="Small variation of the selected pattern" @click="store.mutate()">🧬 MUTATE</button>
+      <button
+        class="btn"
+        :disabled="!store.canResample()"
+        :title="store.canResample()
+          ? 'Learn this pattern\'s lead and write a new one in the same style'
+          : 'Needs a few more notes in the lead to learn from'"
+        @click="store.resampleLead()"
+      >⛓ RESAMPLE</button>
       <button class="btn primary" @click="store.newSong()">⟳ GENERATE</button>
       <button class="btn play" :class="{ active: state.isPlaying }" @click="store.togglePlay()">
         {{ state.isPlaying ? '■ STOP' : '▶ PLAY' }}
@@ -156,6 +168,17 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
             <span>LENGTH</span>
             <select :value="state.song.config.length" @change="onLength">
               <option v-for="l in LENGTHS" :key="l" :value="l">{{ l }}</option>
+            </select>
+          </label>
+
+          <label class="ctl">
+            <span>ROWS</span>
+            <select
+              :value="state.song.config.patternLength ?? 32"
+              title="Rows per pattern — a row is a 16th note, so this sets how long each pattern runs"
+              @change="onPatternLength"
+            >
+              <option v-for="n in PATTERN_LENGTHS" :key="n" :value="n">{{ n }}</option>
             </select>
           </label>
 
@@ -223,6 +246,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 
     <SequenceBar />
     <ChordBar />
+    <InstrumentPanel />
 
     <main class="main">
       <TrackerGrid />

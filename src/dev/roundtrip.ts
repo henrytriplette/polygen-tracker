@@ -3,7 +3,7 @@
 // and cross-checks the data. Run from the browser console:
 //   (await import('/src/dev/roundtrip.ts')).runRoundtrip()
 import JSZip from 'jszip';
-import { generateSong } from '../engine';
+import { CHANNEL_COUNT, generateSong, isDrumChannel } from '../engine';
 import type { Song } from '../engine';
 import { buildPatternsZip, buildPolyendProjectZip } from '../export/polyend';
 import { Tracker } from '../lib/polyend';
@@ -84,8 +84,10 @@ export async function runRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 
 
     const label = song.patternOrder[p];
     const source = song.patterns[label];
-    for (let ch = 0; ch < 4; ch++) {
-      for (let row = 0; row < 32; row++) {
+    const rows = Math.max(0, (source[0]?.length ?? 2) - 2);
+    // Channels map 1:1 onto tracks and instrument slots.
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
+      for (let row = 0; row < rows; row++) {
         const srcNote = source[ch][row + 2];
         const step = parsed.tracks[ch].steps[row];
         if (srcNote <= 0) {
@@ -93,17 +95,12 @@ export async function runRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 
           continue;
         }
         checkedNotes++;
-        if (ch === 3) {
-          if (step.note !== 48) errors.push(`${name} drums row${row}: note ${step.note} != 48`);
-          const expectedInst = srcNote <= 6 ? 3 : srcNote <= 22 ? 4 : 5;
-          if (step.instrument !== expectedInst) {
-            errors.push(`${name} drums row${row}: instrument ${step.instrument} != ${expectedInst}`);
-          }
-        } else {
-          if (step.note !== srcNote + ZZFXM_TO_POLYEND) {
-            errors.push(`${name} ch${ch} row${row}: note ${step.note} != ${srcNote + ZZFXM_TO_POLYEND}`);
-          }
-          if (step.instrument !== ch) errors.push(`${name} ch${ch} row${row}: instrument ${step.instrument} != ${ch}`);
+        const expectedNote = isDrumChannel(ch) ? 48 : srcNote + ZZFXM_TO_POLYEND;
+        if (step.note !== expectedNote) {
+          errors.push(`${name} ch${ch} row${row}: note ${step.note} != ${expectedNote}`);
+        }
+        if (step.instrument !== ch) {
+          errors.push(`${name} ch${ch} row${row}: instrument ${step.instrument} != ${ch}`);
         }
       }
     }
@@ -112,7 +109,7 @@ export async function runRoundtrip(existingSong?: Song, trackCount: 8 | 12 | 16 
 
   // --- instruments ---
   const instrumentPaths = paths.filter((p) => p.startsWith('instruments/'));
-  if (instrumentPaths.length !== 6) errors.push(`expected 6 instruments, got ${instrumentPaths.length}`);
+  if (instrumentPaths.length !== CHANNEL_COUNT) errors.push(`expected ${CHANNEL_COUNT} instruments, got ${instrumentPaths.length}`);
   const sampleLengths: Record<string, number> = {};
   for (const path of instrumentPaths) {
     const file = await asFile(zip, path);
@@ -154,8 +151,9 @@ export async function runPatternsRoundtrip(existingSong?: Song, trackCount: 8 | 
     }
     if (parsed.trackCount !== trackCount) errors.push(`${name}: trackCount ${parsed.trackCount} != ${trackCount}`);
     const source = song.patterns[song.patternOrder[p]];
-    for (let ch = 0; ch < 4; ch++) {
-      for (let row = 0; row < 32; row++) {
+    const rows = Math.max(0, (source[0]?.length ?? 2) - 2);
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
+      for (let row = 0; row < rows; row++) {
         const srcNote = source[ch][row + 2];
         const step = parsed.tracks[ch].steps[row];
         if (srcNote <= 0 && step.note !== -1) errors.push(`${name} ch${ch} row${row}: expected empty`);

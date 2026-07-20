@@ -29,10 +29,17 @@
   --ref: #5a9cff;            /* references / linked data (blue) */
   --fx: #a08ce6;             /* modulation / automation (purple) */
 
-  --ch-lead: #5dd97c;        /* green — melodic notes */
-  --ch-harmony: #4ecbe0;
-  --ch-bass: #e8c95a;
-  --ch-drums: #e86a5a;       /* red — drum events */
+  /* One hue per channel. Pitched voices sit in the green→blue range,
+     the three drums share a warm red family, distinguished by lightness. */
+  --ch-lead: #5dd97c;        /* green  — melody */
+  --ch-harmony: #4ecbe0;     /* cyan   — chords */
+  --ch-bass: #e8c95a;        /* yellow — bass */
+  --ch-kick: #e86a5a;        /* red    — kick */
+  --ch-snare: #f0937f;       /* salmon — snare */
+  --ch-hat: #f5bfae;         /* pale   — hat */
+  --ch-arp: #b98ce0;         /* violet — arpeggio */
+  --ch-pad: #7f9be8;         /* blue   — pad */
+  --ch-drums: var(--ch-kick); /* legacy alias */
 
   --row-beat: rgba(255, 255, 255, 0.028);
   --row-hi: rgba(255, 255, 255, 0.055);

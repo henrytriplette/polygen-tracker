@@ -1,7 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, CHANNEL_SOUND_OPTIONS, VIBE_GROUPS } from '../store';
-import { DRUM_NOTES, FX_VALUES, drumNoteToName, effectToDisplayString, noteToZzfxm, zzfxmToNoteName } from '../engine';
+import type { BlockRect } from '../store';
+import {
+  CHANNEL_COUNT,
+  DRUM_HIT_NOTE,
+  FX_VALUES,
+  drumChannelLabel,
+  effectToDisplayString,
+  isDrumChannel,
+  noteToZzfxm,
+  zzfxmToNoteName,
+} from '../engine';
 import type { VibeName } from '../engine';
 
 const state = store.state;
@@ -28,7 +38,7 @@ const octave = ref(4);
 const gridEl = ref<HTMLElement | null>(null);
 
 // FX lane: number keys place effects with their default values
-const FX_KEY_CODES = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR'] as const;
+const FX_KEY_CODES = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR', 'CN'] as const;
 
 // FastTracker-style piano layout: bottom row = current octave, top row = +1.
 const PIANO_KEYS: Record<string, number> = {
@@ -36,28 +46,86 @@ const PIANO_KEYS: Record<string, number> = {
   q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20, y: 21, '7': 22, u: 23,
 };
 
-const DRUM_KEYS: Record<string, number> = {
-  '1': DRUM_NOTES.KICK,
-  '2': DRUM_NOTES.SNARE,
-  '3': DRUM_NOTES.HAT,
-};
+// On a drum channel every hit is the same one-shot; 1 places it.
+const DRUM_KEYS = new Set(['1', '2', '3']);
 
-function selectCell(ch: number, row: number, lane: 'note' | 'fx' = 'note') {
+// --- Block selection --------------------------------------------------------
+// The anchor is where a selection started; the cursor is its moving corner.
+// With no anchor, block operations act on the single cell under the cursor.
+const anchor = ref<{ ch: number; row: number } | null>(null);
+
+const selection = computed<BlockRect | null>(() => {
+  if (!cursor.value) return null;
+  const a = anchor.value ?? { ch: cursor.value.ch, row: cursor.value.row };
+  return {
+    chStart: Math.min(a.ch, cursor.value.ch),
+    chEnd: Math.max(a.ch, cursor.value.ch),
+    rowStart: Math.min(a.row, cursor.value.row),
+    rowEnd: Math.max(a.row, cursor.value.row),
+  };
+});
+
+/** True when more than one cell is selected (so the highlight is worth showing). */
+const hasSelection = computed(() => {
+  const s = selection.value;
+  return !!s && (s.chStart !== s.chEnd || s.rowStart !== s.rowEnd);
+});
+
+function inSelection(ch: number, row: number): boolean {
+  const s = selection.value;
+  if (!s || !hasSelection.value) return false;
+  return ch >= s.chStart && ch <= s.chEnd && row >= s.rowStart && row <= s.rowEnd;
+}
+
+function selectCell(ch: number, row: number, lane: 'note' | 'fx' = 'note', extend = false) {
+  if (extend && cursor.value) {
+    // Shift+click keeps the existing anchor (or drops one at the old cursor)
+    anchor.value ??= { ch: cursor.value.ch, row: cursor.value.row };
+  } else {
+    anchor.value = null;
+  }
   cursor.value = { ch, row, lane };
+  state.instrumentChannel = ch; // the instrument panel follows the cursor
   gridEl.value?.focus();
 }
 
-function moveCursor(dCol: number, dRow: number) {
+function moveCursor(dCol: number, dRow: number, extend = false) {
   if (!cursor.value) return;
   const { ch, row, lane } = cursor.value;
+
+  if (extend) {
+    anchor.value ??= { ch, row };
+  } else {
+    anchor.value = null;
+  }
+
   // Horizontal movement walks columns: note, fx, note, fx, ... across channels
   let col = ch * 2 + (lane === 'fx' ? 1 : 0) + dCol;
-  col = ((col % 8) + 8) % 8;
+  const columns = CHANNEL_COUNT * 2;
+  col = ((col % columns) + columns) % columns;
   cursor.value = {
     ch: Math.floor(col / 2),
     lane: col % 2 === 0 ? 'note' : 'fx',
-    row: (row + dRow + 32) % 32,
+    row: (row + dRow + rowCount.value) % rowCount.value,
   };
+}
+
+/** Ctrl+A: the whole channel, then the whole pattern on a second press. */
+function selectAll() {
+  if (!cursor.value) return;
+  const s = selection.value;
+  const wholeChannel = s && s.rowStart === 0 && s.rowEnd === rowCount.value - 1;
+  if (wholeChannel && s.chStart === 0 && s.chEnd === CHANNEL_COUNT - 1) {
+    anchor.value = null; // third press clears
+    return;
+  }
+  if (wholeChannel) {
+    anchor.value = { ch: 0, row: 0 };
+    cursor.value = { ch: CHANNEL_COUNT - 1, row: rowCount.value - 1, lane: 'note' };
+    return;
+  }
+  anchor.value = { ch: cursor.value.ch, row: 0 };
+  cursor.value = { ...cursor.value, row: rowCount.value - 1 };
 }
 
 function enterNote(note: number) {
@@ -77,18 +145,47 @@ function currentEffect() {
 function onKey(e: KeyboardEvent) {
   if (!cursor.value) return;
   const key = e.key.toLowerCase();
+  const mod = e.ctrlKey || e.metaKey;
+  const block = selection.value;
+
+  // --- Block operations (checked before plain movement/typing) --------------
+  if (mod && block) {
+    // Ctrl + up/down transposes; shift makes it an octave
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const amount = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1);
+      store.transposeBlock(block, amount);
+      e.preventDefault();
+      return;
+    }
+    switch (key) {
+      case 'c': store.copyBlock(block); e.preventDefault(); return;
+      case 'x': store.cutBlock(block); e.preventDefault(); return;
+      case 'v': store.pasteBlock(cursor.value.ch, cursor.value.row); e.preventDefault(); return;
+      case 'a': selectAll(); e.preventDefault(); return;
+    }
+  }
 
   switch (e.key) {
-    case 'ArrowUp': moveCursor(0, -1); e.preventDefault(); return;
-    case 'ArrowDown': moveCursor(0, 1); e.preventDefault(); return;
-    case 'ArrowLeft': moveCursor(-1, 0); e.preventDefault(); return;
-    case 'ArrowRight': moveCursor(1, 0); e.preventDefault(); return;
-    case 'Escape': cursor.value = null; return;
+    case 'ArrowUp': moveCursor(0, -1, e.shiftKey); e.preventDefault(); return;
+    case 'ArrowDown': moveCursor(0, 1, e.shiftKey); e.preventDefault(); return;
+    case 'ArrowLeft': moveCursor(-1, 0, e.shiftKey); e.preventDefault(); return;
+    case 'ArrowRight': moveCursor(1, 0, e.shiftKey); e.preventDefault(); return;
+    case 'Escape':
+      // First press drops the selection, second leaves edit mode
+      if (anchor.value) anchor.value = null;
+      else cursor.value = null;
+      return;
     case 'Delete':
     case 'Backspace':
-      if (cursor.value.lane === 'fx') store.setEffect(cursor.value.ch, cursor.value.row, null);
-      else store.setNote(cursor.value.ch, cursor.value.row, 0);
-      moveCursor(0, 1);
+      if (hasSelection.value && block) {
+        store.clearBlock(block);
+      } else if (cursor.value.lane === 'fx') {
+        store.setEffect(cursor.value.ch, cursor.value.row, null);
+        moveCursor(0, 1);
+      } else {
+        store.setNote(cursor.value.ch, cursor.value.row, 0);
+        moveCursor(0, 1);
+      }
       e.preventDefault();
       return;
   }
@@ -129,8 +226,8 @@ function onKey(e: KeyboardEvent) {
   if (key === '.') { store.setNote(cursor.value.ch, cursor.value.row, 0); moveCursor(0, 1); e.preventDefault(); return; }
 
   // Drums: 1/2/3 = kick/snare/hat (takes priority over the piano's sharp digits)
-  if (cursor.value.ch === 3 && key in DRUM_KEYS) {
-    enterNote(DRUM_KEYS[key]);
+  if (isDrumChannel(cursor.value.ch) && DRUM_KEYS.has(key)) {
+    enterNote(DRUM_HIT_NOTE);
     e.preventDefault();
     return;
   }
@@ -144,6 +241,27 @@ function onKey(e: KeyboardEvent) {
 }
 
 const pattern = computed(() => state.song.patterns[state.selectedPattern]);
+/**
+ * Rows in the selected pattern. The song's configured length is authoritative;
+ * trusting one channel's array length would render rows the other channels
+ * don't have if a pattern ever went ragged.
+ */
+const rowCount = computed(() => {
+  const configured = state.song.config.patternLength;
+  if (configured) return configured;
+  return Math.max(1, (pattern.value?.[0]?.length ?? 34) - 2);
+});
+
+// Shrinking the pattern can leave the cursor or selection pointing past the
+// last row; pull them back in so edits can't be aimed out of bounds.
+watch(rowCount, (rows) => {
+  if (cursor.value && cursor.value.row >= rows) {
+    cursor.value = { ...cursor.value, row: rows - 1 };
+  }
+  if (anchor.value && anchor.value.row >= rows) {
+    anchor.value = { ...anchor.value, row: rows - 1 };
+  }
+});
 const effects = computed(() => state.song.patternEffects?.[state.selectedPattern]);
 
 // The playhead only lights up rows when the selected pattern is the one playing.
@@ -154,9 +272,9 @@ const liveRow = computed(() => {
 });
 
 function noteAt(ch: number, row: number): string {
-  const note = pattern.value[ch][row + 2];
-  if (note <= 0) return '---';
-  return ch === 3 ? drumNoteToName(note) : zzfxmToNoteName(note);
+  const note = pattern.value?.[ch]?.[row + 2];
+  if (!note || note <= 0) return '---';
+  return isDrumChannel(ch) ? drumChannelLabel(ch) : zzfxmToNoteName(note);
 }
 
 function fxAt(ch: number, row: number): string {
@@ -164,7 +282,7 @@ function fxAt(ch: number, row: number): string {
 }
 
 function hasNote(ch: number, row: number): boolean {
-  return pattern.value[ch][row + 2] > 0;
+  return (pattern.value?.[ch]?.[row + 2] ?? 0) > 0;
 }
 </script>
 
@@ -235,28 +353,30 @@ function hasNote(ch: number, row: number): boolean {
       </thead>
       <tbody>
         <tr
-          v-for="row in 32"
+          v-for="row in rowCount"
           :key="row"
           :class="{ beat: (row - 1) % 4 === 0, live: liveRow === row - 1 }"
         >
           <td class="rownum">{{ (row - 1).toString(16).toUpperCase().padStart(2, '0') }}</td>
-          <template v-for="ch in 4" :key="ch">
+          <template v-for="ch in CHANNEL_COUNT" :key="ch">
             <td
               class="note"
               :style="hasNote(ch - 1, row - 1) ? { color: store.channelColor(ch - 1) } : undefined"
               :class="{
                 empty: !hasNote(ch - 1, row - 1),
                 cursor: cursor?.ch === ch - 1 && cursor?.row === row - 1 && cursor?.lane === 'note',
+                selected: inSelection(ch - 1, row - 1),
               }"
-              @click="selectCell(ch - 1, row - 1, 'note')"
+              @click="selectCell(ch - 1, row - 1, 'note', $event.shiftKey)"
             >{{ noteAt(ch - 1, row - 1) }}</td>
             <td
               class="fx"
               :class="{
                 empty: fxAt(ch - 1, row - 1) === '----',
                 cursor: cursor?.ch === ch - 1 && cursor?.row === row - 1 && cursor?.lane === 'fx',
+                selected: inSelection(ch - 1, row - 1),
               }"
-              @click="selectCell(ch - 1, row - 1, 'fx')"
+              @click="selectCell(ch - 1, row - 1, 'fx', $event.shiftKey)"
             >{{ fxAt(ch - 1, row - 1) }}</td>
           </template>
         </tr>
@@ -266,6 +386,9 @@ function hasNote(ch: number, row: number): boolean {
       <span v-if="cursor" class="edit-active">
         EDIT {{ CHANNEL_LABELS[cursor.ch] }} {{ cursor.row.toString(16).toUpperCase().padStart(2, '0') }}
         · OCT {{ octave }}
+        <template v-if="hasSelection && selection">
+          · SEL {{ selection.chEnd - selection.chStart + 1 }}CH×{{ selection.rowEnd - selection.rowStart + 1 }}
+        </template>
       </span>
       <span v-else class="edit-idle">CLICK A NOTE CELL TO EDIT</span>
       <button
@@ -276,8 +399,9 @@ function hasNote(ch: number, row: number): boolean {
       >SNAP:{{ state.snapToScale ? 'ON' : 'OFF' }}</button>
       <span class="edit-help">
         {{ cursor?.lane === 'fx'
-          ? '1-8 = SU SD VB DT ST PD BC TR · +/- value · DEL clear · arrows move · ESC done'
-          : 'Z-M / Q-U notes · 1/2/3 drums · DEL clear · +/- octave · arrows move · ESC done' }}
+          ? '1-9 = SU SD VB DT ST PD BC TR CN(chance) · +/- value · DEL clear'
+          : 'Z-M / Q-U notes · 1/2/3 drums · +/- octave · DEL clear' }}
+        · SHIFT+arrows select · CTRL+C/X/V · CTRL+↑↓ transpose (+SHIFT octave) · CTRL+A all
       </span>
     </div>
   </div>
@@ -421,6 +545,8 @@ td {
 }
 
 .fx:hover { background: rgba(160, 140, 230, 0.12); }
+
+td.selected { background: var(--accent-soft); }
 
 .fx.cursor {
   outline: 2px solid var(--fx);

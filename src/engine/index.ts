@@ -1,6 +1,26 @@
-export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, applyChannelVibe, applyChannelAlgo, applyChannelSound, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
+export { generateSong, regenerateForVibe, regenerateAllPatterns, regenerateWithNewLength, regeneratePattern, regenerateChannel, regenerateChannelInAllPatterns, addPatternToSong, duplicatePatternInSong, applyChannelVibe, applyChannelAlgo, applyChannelSound, applyChordsToPattern, applySongStructure, songToZzfxm, renderSongBuffers } from './song';
 export { STRUCTURE_OPTIONS, findStructure } from './structures';
 export { mutatePattern } from './mutate';
+export {
+  MELODIC_STYLES,
+  VIBE_MELODIC_STYLE,
+  HARMONIC_STYLES,
+  VIBE_HARMONIC_STYLE,
+  markovProgressionDegrees,
+  melodicStyleFor,
+} from './markov';
+export { generateMarkovMelody, learnMelodyTable } from './melody';
+export { progressionDegreesFor, resampleLead, canResampleLead, MIN_LEARN_NOTES } from './song';
+export type { ChordMode } from './types';
+export {
+  PARAM_DEFS,
+  PARAM_GROUPS,
+  SHAPE_NAMES,
+  ZZFX_PARAM,
+  envelopePoints,
+  paramsInGroup,
+} from './instrumentParams';
+export type { ParamDef, ParamGroup } from './instrumentParams';
 export { withSeed, randomSeed } from './random';
 export type { StructureOption } from './structures';
 export type { ChannelAlgos, LeadAlgo, HarmonyAlgo, BassAlgo, DrumAlgo } from './altPatterns';
@@ -8,7 +28,33 @@ export { generateInstruments, generateInstrumentForChannel, CHANNEL_SOUND_OPTION
 export { ZZFX, zzfxP, zzfxMChannels, unlockAudio, getAnalyser, floatsToWav } from './zzfx';
 export { AudioGraph } from './audioGraph';
 export { CHROMATIC, SCALES, getScaleNotes, zzfxmToNoteName, noteToZzfxm, snapNoteToScale } from './scales';
-export { drumNoteToName, DRUM_NOTES, effectToDisplayString } from './types';
+export {
+  drumNoteToName,
+  drumChannelLabel,
+  DRUM_NOTES,
+  DRUM_HIT_NOTE,
+  DRUM_CHANNELS,
+  CHANNELS,
+  CHANNEL_COUNT,
+  CH_LEAD,
+  CH_HARMONY,
+  CH_BASS,
+  CH_KICK,
+  CH_SNARE,
+  CH_HAT,
+  CH_ARP,
+  CH_PAD,
+  isDrumChannel,
+  channelFamily,
+  effectToDisplayString,
+  PATTERN_LENGTHS,
+  DEFAULT_PATTERN_LENGTH,
+  RHYTHM_PERIOD,
+  DRUM_PERIOD,
+  CHORD_SEGMENTS,
+  rowsPerChord,
+} from './types';
+export type { PatternLength } from './types';
 export { euclidean } from './euclidean';
 export { VIBE_CONFIG, getRandomBpm } from './vibes';
 export { generateChordProgression, progressionFromDegrees, randomProgressionDegrees, chordDisplayName, CHORDS_PER_PATTERN } from './chords';

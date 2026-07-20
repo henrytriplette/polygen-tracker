@@ -1,14 +1,21 @@
 // Minimal Standard MIDI File (type 1) export.
 // Timing: one pattern row = a 16th note = 24 ticks at 96 PPQ.
 // Pitch: zzfxm note 12 = C4 = MIDI 60, so midi = zzfxm + 48.
+import { CHANNEL_COUNT, CH_HAT, CH_KICK, CH_SNARE, isDrumChannel } from '../engine';
 import type { Song } from '../engine';
 
 const PPQ = 96;
 const TICKS_PER_ROW = PPQ / 4;
-const ROWS = 32;
 
-const TRACK_NAMES = ['Lead', 'Harmony', 'Bass', 'Drums'];
-const GM_DRUMS = { kick: 36, snare: 38, hat: 42 };
+
+const TRACK_NAMES = ['Lead', 'Harmony', 'Bass', 'Kick', 'Snare', 'Hat', 'Arp', 'Pad'];
+
+// GM percussion notes for the three drum channels (index by channel).
+const GM_DRUM_NOTE: Record<number, number> = {
+  [CH_KICK]: 36,  // Bass Drum 1
+  [CH_SNARE]: 38, // Acoustic Snare
+  [CH_HAT]: 42,   // Closed Hi-Hat
+};
 
 interface MidiEvent {
   tick: number;
@@ -44,11 +51,6 @@ function trackChunk(events: MidiEvent[]): number[] {
   return [...header, ...body];
 }
 
-function drumMidiNote(zzfxmNote: number): number {
-  if (zzfxmNote <= 6) return GM_DRUMS.kick;
-  if (zzfxmNote <= 22) return GM_DRUMS.snare;
-  return GM_DRUMS.hat;
-}
 
 export function buildMidiFile(song: Song): Blob {
   const humanize = Math.max(0, Math.min(30, song.config.humanize ?? 0));
@@ -61,8 +63,8 @@ export function buildMidiFile(song: Song): Blob {
     { tick: 0, order: 1, bytes: [0xff, 0x51, 0x03, (usPerQuarter >> 16) & 0xff, (usPerQuarter >> 8) & 0xff, usPerQuarter & 0xff] },
   ];
 
-  const channelTracks: MidiEvent[][] = [[], [], [], []];
-  for (let ch = 0; ch < 4; ch++) {
+  const channelTracks: MidiEvent[][] = Array.from({ length: CHANNEL_COUNT }, () => []);
+  for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
     channelTracks[ch].push({
       tick: 0,
       order: 0,
@@ -73,24 +75,28 @@ export function buildMidiFile(song: Song): Blob {
   song.sequence.forEach((patternIdx, seqPos) => {
     const label = song.patternOrder[patternIdx];
     const pattern = song.patterns[label];
+    const ROWS = Math.max(0, (pattern?.[0]?.length ?? 2) - 2);
     const baseTick = seqPos * ROWS * TICKS_PER_ROW;
 
-    for (let ch = 0; ch < 4; ch++) {
-      const midiChannel = ch === 3 ? 9 : ch; // GM drums live on channel 10
-      const notes = pattern[ch].slice(2);
+    for (let ch = 0; ch < CHANNEL_COUNT; ch++) {
+      const drum = isDrumChannel(ch);
+      // GM percussion lives on channel 10 (index 9); melodic channels take
+      // their own, skipping 9 so nothing lands on the drum channel.
+      const midiChannel = drum ? 9 : ch < 9 ? ch : ch + 1;
+      const notes = pattern[ch]?.slice(2) ?? [];
 
       for (let row = 0; row < ROWS; row++) {
         const note = notes[row];
-        if (note <= 0) continue;
+        if (!note || note <= 0) continue;
 
-        const midiNote = ch === 3
-          ? drumMidiNote(note)
+        const midiNote = drum
+          ? GM_DRUM_NOTE[ch] ?? 38
           : Math.max(0, Math.min(127, Math.floor(note) + 48));
 
         // Duration: until the next note on this channel or the pattern end;
         // drums are always one row.
         let durRows = 1;
-        if (ch !== 3) {
+        if (!drum) {
           durRows = ROWS - row;
           for (let next = row + 1; next < ROWS; next++) {
             if (notes[next] > 0) {

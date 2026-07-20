@@ -1,8 +1,7 @@
-import { NoteName, ScaleName, ChannelData } from './types';
+import { NoteName, ScaleName, ChannelData, RHYTHM_PERIOD, rowsPerChord } from './types';
 import { ChordProgression } from './chords';
 
-const ROWS = 32;
-const ROWS_PER_CHORD = 8;
+const ROWS_PER_CHORD = RHYTHM_PERIOD;
 
 // Bass rhythm templates for one chord segment (8 rows)
 // Bass is simple and supportive — anchors the harmony
@@ -110,10 +109,14 @@ export function generateBassPattern(
   const templates = BASS_TEMPLATES[style];
   const rhythm = templates[Math.floor(Math.random() * templates.length)];
 
-  const notes: number[] = [];
+  const length = progression.chordAtRow.length;
+  const notes: number[] = Array(length).fill(0);
 
-  for (let chordIdx = 0; chordIdx < 4; chordIdx++) {
-    const chord = progression.chords[chordIdx];
+  // The rhythm figure repeats every ROWS_PER_CHORD rows; the chord under it
+  // comes from the progression, so both stay correct at any pattern length.
+  for (let start = 0; start < length; start += ROWS_PER_CHORD) {
+    const blockLength = Math.min(ROWS_PER_CHORD, length - start);
+    const chord = progression.chordAtRow[start];
     const segment = generateBassSegment(
       rhythm,
       chord.root,
@@ -122,15 +125,14 @@ export function generateBassPattern(
       config.voicing,
     );
 
-    // Sync with kick: if kick hits and bass doesn't, 40% chance to add root
-    for (let i = 0; i < ROWS_PER_CHORD; i++) {
-      const globalRow = chordIdx * ROWS_PER_CHORD + i;
-      if (kickPattern[globalRow] && segment[i] === 0 && Math.random() < 0.4) {
-        segment[i] = chord.root;
+    for (let i = 0; i < blockLength; i++) {
+      const row = start + i;
+      // Sync with kick: if the kick hits and the bass doesn't, often add a root
+      if (kickPattern[row] && segment[i] === 0 && Math.random() < 0.4) {
+        segment[i] = progression.chordAtRow[row].root;
       }
+      notes[row] = segment[i];
     }
-
-    notes.push(...segment);
   }
 
   return [2, 0, ...notes];
