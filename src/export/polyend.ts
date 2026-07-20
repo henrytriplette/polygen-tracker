@@ -24,6 +24,7 @@ import {
   type FX,
   type StepData,
 } from '../lib/polyend';
+import { buildProjectReadme } from './cheatsheet';
 
 export interface PolyendExportOptions {
   /**
@@ -173,6 +174,8 @@ export async function buildPatternsZip(song: Song, options: PolyendExportOptions
     zip.file(`pattern_${String(patternIdx + 1).padStart(2, '0')}.mtp`, Pattern.write(pattern));
   });
 
+  zip.file('README.txt', buildProjectReadme(song, trackCount));
+
   return zip.generateAsync({ type: 'blob' });
 }
 
@@ -223,6 +226,10 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   project.song.playlistPos = 0;
 
   zip.file('project.mt', Project.write(project));
+
+  // Plain-language guide to what just landed on the SD card. The device
+  // ignores unknown files, so it rides along harmlessly.
+  zip.file('README.txt', buildProjectReadme(song, trackCount));
 
   return zip.generateAsync({ type: 'blob' });
 }

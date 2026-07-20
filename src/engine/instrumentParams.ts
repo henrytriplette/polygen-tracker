@@ -3,6 +3,7 @@
 // ZzFX sounds are a flat 20-number array. This module gives the musically
 // meaningful slots a label, a safe range and a display format, so the UI can
 // render sliders without hardcoding magic indices.
+import { ZZFX } from './zzfx';
 import type { ZzFXSound } from './types';
 
 export const ZZFX_PARAM = {
@@ -160,15 +161,131 @@ export const PARAM_DEFS: ParamDef[] = [
   },
 ];
 
-export const PARAM_GROUPS: { id: ParamGroup; label: string }[] = [
-  { id: 'tone', label: 'TONE' },
-  { id: 'envelope', label: 'ENVELOPE' },
-  { id: 'motion', label: 'MOTION' },
-  { id: 'texture', label: 'TEXTURE' },
+/**
+ * Per-group descriptions. The per-parameter hints say what a slider *is*;
+ * these say what the group *does to the sound*, which is the level a beginner
+ * actually thinks at ("I want it punchier") before they know which knob that is.
+ */
+export const PARAM_GROUPS: { id: ParamGroup; label: string; description: string }[] = [
+  {
+    id: 'tone',
+    label: 'TONE',
+    description: 'The raw waveform: sine is soft, saw and square are bright, noise becomes drums.',
+  },
+  {
+    id: 'envelope',
+    label: 'ENVELOPE',
+    description: 'How the volume moves over time. Fast in and out is a pluck; slow is a pad.',
+  },
+  {
+    id: 'motion',
+    label: 'MOTION',
+    description: 'Pitch that moves while the note sounds — vibrato, bends, kick-style drops.',
+  },
+  {
+    id: 'texture',
+    label: 'TEXTURE',
+    description: 'Dirt on top: noise breathes, FM turns it metallic, crush makes it lo-fi.',
+  },
 ];
 
 export function paramsInGroup(group: ParamGroup): ParamDef[] {
   return PARAM_DEFS.filter((p) => p.group === group);
+}
+
+//----------------------------------
+// Rendered sample size
+//----------------------------------
+// Every instrument becomes a .pti — a real rendered sample on the SD card, not
+// a synth patch the device recreates. Length therefore has consequences the
+// app itself never shows: a 10ms blip clicks, and a 6-second pad is megabytes
+// of sample memory for one voice. Warn while it is still editable.
+
+export type SampleWarning = 'silent' | 'veryShort' | 'long' | 'veryLong';
+
+export interface SampleReport {
+  seconds: number;
+  /** Size of the exported 16-bit mono WAV, in bytes. */
+  bytes: number;
+  /** Loudest absolute sample value (0..1+). */
+  peak: number;
+  warning: SampleWarning | null;
+  message: string;
+}
+
+/** Below this a one-shot is more click than sound. */
+const VERY_SHORT_SECONDS = 0.02;
+const LONG_SECONDS = 2;
+/**
+ * Maxing every envelope slider tops out around 3.3s, so this tier is not
+ * reachable by editing — it exists for instruments arriving from imported
+ * projects and shared URLs, whose parameters are not range-checked.
+ */
+const VERY_LONG_SECONDS = 5;
+const SILENT_PEAK = 0.001;
+
+const WAV_HEADER_BYTES = 44;
+
+function describe(warning: SampleWarning | null, seconds: number, isDrum: boolean): string {
+  switch (warning) {
+    case 'silent':
+      return 'This renders as silence — it will export as an empty sample. Check that VOL is above zero and that the envelope has some sustain or release.';
+    case 'veryShort':
+      return `Only ${Math.round(seconds * 1000)}ms long. That is short enough to read as a click rather than a note; try raising SUSTAIN or RELEASE.`;
+    case 'veryLong':
+      return `${seconds.toFixed(1)}s is a very long sample for one voice. It will take up a lot of the Tracker's sample memory${
+        isDrum ? ', and a drum this long will overlap its own next hit' : ''
+      }.`;
+    case 'long':
+      return isDrum
+        ? `${seconds.toFixed(1)}s is long for a drum — hits at a fast tempo will overlap each other. Shorten RELEASE for a tighter sound.`
+        : `${seconds.toFixed(1)}s per note. Fine for a pad, but it uses real sample memory on the device.`;
+    default:
+      return '';
+  }
+}
+
+/**
+ * Render the instrument and report what it will cost as a .pti.
+ *
+ * This calls the same synth the exporter does rather than predicting length
+ * from the envelope, because delay and repeat-time both extend a sound past
+ * where the envelope ends — a prediction would quietly understate it.
+ */
+export function sampleReport(params: ZzFXSound, isDrum = false): SampleReport {
+  let samples: number[];
+  try {
+    samples = ZZFX.buildSamples(...params);
+  } catch {
+    return { seconds: 0, bytes: 0, peak: 0, warning: null, message: '' };
+  }
+
+  const seconds = samples.length / ZZFX.sampleRate;
+  let peak = 0;
+  for (const sample of samples) {
+    const abs = sample < 0 ? -sample : sample;
+    if (abs > peak) peak = abs;
+  }
+
+  let warning: SampleWarning | null = null;
+  if (peak < SILENT_PEAK) warning = 'silent';
+  else if (seconds < VERY_SHORT_SECONDS) warning = 'veryShort';
+  else if (seconds > VERY_LONG_SECONDS) warning = 'veryLong';
+  else if (seconds > LONG_SECONDS) warning = 'long';
+
+  return {
+    seconds,
+    bytes: samples.length * 2 + WAV_HEADER_BYTES,
+    peak,
+    warning,
+    message: describe(warning, seconds, isDrum),
+  };
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${bytes}B`;
 }
 
 export interface EnvelopePoint {

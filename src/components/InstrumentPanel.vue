@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { store, CHANNEL_LABELS, CHANNEL_SOUND_OPTIONS } from '../store';
-import { PARAM_GROUPS, envelopePoints, paramsInGroup } from '../engine';
+import {
+  PARAM_GROUPS,
+  envelopePoints,
+  formatBytes,
+  isDrumChannel,
+  paramsInGroup,
+  sampleReport,
+} from '../engine';
 import type { ParamDef } from '../engine';
 
 const state = store.state;
@@ -41,6 +48,30 @@ const envPath = computed(() => {
 });
 
 const envDuration = computed(() => envelopePoints(params.value).duration);
+
+// --- Exported sample size ---------------------------------------------------
+// This renders the instrument for real, the same way the .pti exporter does,
+// which costs up to ~25ms for the longest sounds the sliders can reach. That
+// is past a frame at the rate a drag fires input events, so it settles after
+// the drag rather than tracking it — the number is feedback, not a readout
+// anyone follows mid-gesture.
+const SAMPLE_DEBOUNCE_MS = 150;
+
+const sample = ref(sampleReport(params.value, isDrumChannel(channel.value)));
+let sampleTimer: ReturnType<typeof setTimeout> | undefined;
+
+watch(
+  [params, channel],
+  ([next, ch]) => {
+    clearTimeout(sampleTimer);
+    sampleTimer = setTimeout(() => {
+      sample.value = sampleReport(next, isDrumChannel(ch));
+    }, SAMPLE_DEBOUNCE_MS);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => clearTimeout(sampleTimer));
 
 // Follow the grid's edit cursor so the panel shows the channel you're on
 watch(
@@ -93,10 +124,19 @@ watch(
           <path :d="envPath" fill="none" :stroke="store.channelColor(channel)" stroke-width="1.5" />
         </svg>
         <span class="env-label">ENVELOPE · {{ Math.round(envDuration * 1000) }}ms</span>
+
+        <div class="sample" :class="sample.warning ? 'warn' : ''">
+          <span class="s-size">
+            SAMPLE · {{ sample.seconds < 1 ? Math.round(sample.seconds * 1000) + 'ms' : sample.seconds.toFixed(2) + 's' }}
+            · {{ formatBytes(sample.bytes) }}
+          </span>
+          <p v-if="sample.message" class="s-msg">⚠ {{ sample.message }}</p>
+        </div>
       </div>
 
       <div v-for="group in PARAM_GROUPS" :key="group.id" class="group">
         <span class="group-title">{{ group.label }}</span>
+        <p class="group-desc">{{ group.description }}</p>
         <label v-for="def in paramsInGroup(group.id)" :key="def.index" class="param" :title="def.hint">
           <span class="p-label">{{ def.label }}</span>
           <input
@@ -228,6 +268,42 @@ watch(
   color: var(--text-faint);
   font-weight: 700;
   margin-bottom: 1px;
+}
+
+/* Explanatory text, not a control: dimmer than the labels below it. The fixed
+   height keeps the slider rows aligned across groups even though the lines
+   wrap differently. */
+.group-desc {
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  min-height: 40px;
+  /* Cap the width so a one-line description cannot stretch its column and
+     push the last group onto a row of its own. */
+  max-width: 250px;
+}
+
+.sample {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+  max-width: 200px;
+}
+
+.s-size {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+}
+
+.sample.warn .s-size { color: var(--accent); }
+
+.s-msg {
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--text-dim);
 }
 
 .param {

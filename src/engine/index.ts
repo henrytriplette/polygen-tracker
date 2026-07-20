@@ -18,9 +18,11 @@ export {
   SHAPE_NAMES,
   ZZFX_PARAM,
   envelopePoints,
+  formatBytes,
   paramsInGroup,
+  sampleReport,
 } from './instrumentParams';
-export type { ParamDef, ParamGroup } from './instrumentParams';
+export type { ParamDef, ParamGroup, SampleReport, SampleWarning } from './instrumentParams';
 export { withSeed, randomSeed } from './random';
 export type { StructureOption } from './structures';
 export type { ChannelAlgos, LeadAlgo, HarmonyAlgo, BassAlgo, DrumAlgo } from './altPatterns';

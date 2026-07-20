@@ -28,9 +28,9 @@ The generator already makes musically-informed decisions. Right now it makes the
 
 The Tracker itself is a barrier. This app already knows the format intimately, so it's well placed to teach it.
 
-- ★ **Exported cheat-sheet** — drop a `README.txt` into the exported project zip: which instrument is on which track, what the FX in the pattern do, how to load it on the device, what to try changing first. Costs almost nothing and lands exactly when the user is staring at unfamiliar hardware.
-- **FX column decoder** — a reference panel mapping Polyend's single-letter FX to what they audibly do, with examples drawn from the current song's own patterns.
-- **"What changed on export" notes** — flag the honest gaps: duty-cycle and pitch-drop effects don't survive to the hardware. Better to say so than let someone wonder why the export sounds different.
+- ~~**Exported cheat-sheet**~~ — *done.* Both export zips carry a `README.txt` describing the genre, the track/instrument map, the arrangement, the chords in roman numerals, every FX actually used, the groove settings and five things to try first. It also names the empty tracks as deliberate space rather than omissions.
+- **FX column decoder** — a reference panel mapping Polyend's single-letter FX to what they audibly do, with examples drawn from the current song's own patterns. *Partly covered by the exported cheat-sheet, but only for FX the song happens to use, and only after export.*
+- ~~**"What changed on export" notes**~~ — *done*, as part of the cheat-sheet: it names duty-cycle and pitch-drop as the two effects with no sample-based equivalent, so a cleaner-sounding export is explained rather than mysterious.
 - **Device-shaped constraints preview** — warn when a song uses more instruments or longer patterns than the target firmware supports, before the export lands on the SD card.
 
 ## 4. Arrangement help
@@ -39,7 +39,7 @@ Beginners can usually make a good 8-bar loop and then stall. This is where a gen
 
 - ★ **Tension curve** — a drawable energy envelope across the song that modulates density, register and effect budget continuously, rather than only per section role. Makes long patterns breathe and teaches that arrangement *is* energy management.
 - **Arrangement coach** — non-judgemental observations: "every section has all 8 channels playing — try muting the pad in the verse", "your chorus isn't denser than your verse". Rules of thumb, phrased as suggestions.
-- **Song duration display** — you currently can't tell how long a track is without exporting it. Trivial, and beginners genuinely care ("is this long enough to be a track?").
+- **Song duration display** — you currently can't tell how long a track is without exporting it. Trivial, and beginners genuinely care ("is this long enough to be a track?"). *The exported cheat-sheet now states the duration, so the calculation exists; it just isn't in the UI yet.*
 - **A/B snapshot** — stash the current version, try something, toggle between them. Teaches critical listening more than any explanation.
 
 ## 5. More generative algorithms
@@ -84,7 +84,7 @@ For this specific user, in order:
 
 1. ~~Copy/paste + transpose~~ — **done**; cheap experimentation is how beginners learn.
 2. ~~Per-step chance~~ — **done**; keeps the export alive on the hardware.
-3. **Exported cheat-sheet** — smallest effort, lands at the exact moment of confusion.
+3. ~~Exported cheat-sheet~~ — **done**; lands at the exact moment of confusion.
 4. **Starter packs** — removes the blank page, and is a teaching artefact.
 5. **Tension curve** — the arrangement lesson most people need after their first good loop.
 
