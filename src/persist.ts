@@ -45,7 +45,35 @@ const LEGACY_ROWS = 32; // songs from before variable pattern length
  * channel fans out to kick/snare/hat by its note encoding, and the new
  * ARP/PAD channels start empty so nothing appears out of nowhere.
  */
+/**
+ * Force every channel of every pattern to the song's declared row count.
+ * A ragged pattern (channels of differing lengths) makes the grid read past
+ * the end of the shorter ones, so repair it on the way in rather than trusting
+ * whatever was stored.
+ */
+function normaliseRowLengths(song: Song): Song {
+  const rows = song.config.patternLength ?? LEGACY_ROWS;
+  const patterns: Song['patterns'] = { ...song.patterns };
+  let repaired = false;
+
+  for (const label of song.patternOrder) {
+    const pattern = song.patterns[label];
+    if (!pattern) continue;
+    if (pattern.every((c) => c.length === rows + 2)) continue;
+
+    repaired = true;
+    patterns[label] = pattern.map((channel, ch) => {
+      const fixed = [channel[0] ?? ch, channel[1] ?? 0];
+      for (let r = 0; r < rows; r++) fixed.push(channel[r + 2] ?? 0);
+      return fixed;
+    });
+  }
+
+  return repaired ? { ...song, patterns } : song;
+}
+
 export function migrateSong(song: Song): Song {
+  song = normaliseRowLengths(song);
   const firstPattern = song.patterns[song.patternOrder[0]];
   if (!firstPattern || firstPattern.length >= CHANNEL_COUNT) return song;
 

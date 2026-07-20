@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { store, CHANNEL_LABELS, CHANNEL_ALGO_OPTIONS, CHANNEL_SOUND_OPTIONS, VIBE_GROUPS } from '../store';
 import type { BlockRect } from '../store';
 import {
@@ -241,8 +241,27 @@ function onKey(e: KeyboardEvent) {
 }
 
 const pattern = computed(() => state.song.patterns[state.selectedPattern]);
-/** Rows in the selected pattern (drives the grid and cursor wrapping). */
-const rowCount = computed(() => Math.max(1, (pattern.value?.[0]?.length ?? 34) - 2));
+/**
+ * Rows in the selected pattern. The song's configured length is authoritative;
+ * trusting one channel's array length would render rows the other channels
+ * don't have if a pattern ever went ragged.
+ */
+const rowCount = computed(() => {
+  const configured = state.song.config.patternLength;
+  if (configured) return configured;
+  return Math.max(1, (pattern.value?.[0]?.length ?? 34) - 2);
+});
+
+// Shrinking the pattern can leave the cursor or selection pointing past the
+// last row; pull them back in so edits can't be aimed out of bounds.
+watch(rowCount, (rows) => {
+  if (cursor.value && cursor.value.row >= rows) {
+    cursor.value = { ...cursor.value, row: rows - 1 };
+  }
+  if (anchor.value && anchor.value.row >= rows) {
+    anchor.value = { ...anchor.value, row: rows - 1 };
+  }
+});
 const effects = computed(() => state.song.patternEffects?.[state.selectedPattern]);
 
 // The playhead only lights up rows when the selected pattern is the one playing.
@@ -253,8 +272,8 @@ const liveRow = computed(() => {
 });
 
 function noteAt(ch: number, row: number): string {
-  const note = pattern.value[ch][row + 2];
-  if (note <= 0) return '---';
+  const note = pattern.value?.[ch]?.[row + 2];
+  if (!note || note <= 0) return '---';
   return isDrumChannel(ch) ? drumChannelLabel(ch) : zzfxmToNoteName(note);
 }
 
@@ -263,7 +282,7 @@ function fxAt(ch: number, row: number): string {
 }
 
 function hasNote(ch: number, row: number): boolean {
-  return pattern.value[ch][row + 2] > 0;
+  return (pattern.value?.[ch]?.[row + 2] ?? 0) > 0;
 }
 </script>
 

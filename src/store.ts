@@ -755,6 +755,7 @@ export const store = {
 
   /** Write or clear one step effect in the selected pattern. */
   setEffect(ch: number, row: number, effect: NoteEffect | null): void {
+    if (ch < 0 || ch >= CHANNEL_COUNT || row < 0 || row >= patternRows()) return;
     const label = state.selectedPattern;
     const existing = state.song.patternEffects?.[label];
     const rows = patternRows();
@@ -771,6 +772,9 @@ export const store = {
 
   /** Write one note (0 = clear) into the selected pattern. */
   setNote(ch: number, row: number, note: number): void {
+    // Guard the bounds here, not just in the UI: writing past the end would
+    // silently extend one channel and leave the pattern ragged.
+    if (ch < 0 || ch >= CHANNEL_COUNT || row < 0 || row >= patternRows()) return;
     const label = state.selectedPattern;
     const pattern = state.song.patterns[label].map((c) => [...c]) as Pattern;
     pattern[ch][row + 2] = note;
