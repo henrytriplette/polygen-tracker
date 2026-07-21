@@ -247,8 +247,10 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 
     <SequenceBar />
     <ChordBar />
-    <FragmentBank />
-    <InstrumentPanel />
+    <div class="panel-row">
+      <FragmentBank />
+      <InstrumentPanel />
+    </div>
 
     <main class="main">
       <TrackerGrid />
@@ -311,6 +313,26 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
   height: 100vh;
   padding: 10px 14px 8px;
   gap: 8px;
+}
+
+/* Fragments and the instrument editor share a row while both are collapsed,
+   so two headers cost one row instead of two. Either one that is open claims
+   the full width and pushes the other onto its own line — the class comes
+   from the panel's own root element, so this follows their state without the
+   parent having to track it. */
+.panel-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.panel-row > .open {
+  flex-basis: 100%;
 }
 
 .bar {

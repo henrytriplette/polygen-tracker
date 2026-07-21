@@ -32,7 +32,7 @@ function density(fragment: Fragment): number {
 </script>
 
 <template>
-  <section class="bank">
+  <section class="bank" :class="{ open }">
     <header class="bar">
       <button class="toggle" :title="open ? 'Hide fragment bank' : 'Show fragment bank'" @click="open = !open">
         {{ open ? '▾' : '▸' }} FRAGMENTS
