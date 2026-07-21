@@ -5,6 +5,7 @@ import { CHROMATIC, STRUCTURE_OPTIONS } from './engine';
 import type { NoteName, PatternLength, ScaleName, SongLength, VibeName } from './engine';
 import ChordBar from './components/ChordBar.vue';
 import InstrumentPanel from './components/InstrumentPanel.vue';
+import FragmentBank from './components/FragmentBank.vue';
 import Oscilloscope from './components/Oscilloscope.vue';
 import SequenceBar from './components/SequenceBar.vue';
 import TrackerGrid from './components/TrackerGrid.vue';
@@ -246,6 +247,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
 
     <SequenceBar />
     <ChordBar />
+    <FragmentBank />
     <InstrumentPanel />
 
     <main class="main">
@@ -260,6 +262,13 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
           <option :value="12">Tracker fw 1.9+ (12 trk)</option>
           <option :value="8">Tracker fw ≤1.8 (8 trk)</option>
           <option :value="16">Tracker+ / Mini (16 trk)</option>
+        </select>
+      </label>
+      <label class="ctl">
+        <span>DRUMS</span>
+        <select v-model="state.exportDrumKit" title="Sliced puts kick/snare/hat in one instrument, freeing two slots on the device">
+          <option value="separate">3 instruments</option>
+          <option value="sliced">1 sliced kit</option>
         </select>
       </label>
       <button class="btn primary" :disabled="state.isExporting" @click="store.exportPolyend()">

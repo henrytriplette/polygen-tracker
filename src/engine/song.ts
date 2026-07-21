@@ -36,6 +36,7 @@ import { generateHarmonyPattern } from './harmony';
 import { progressionFromDegrees, randomProgressionDegrees, ChordProgression } from './chords';
 import { markovProgressionDegrees } from './markov';
 import { getScaleNotes } from './scales';
+import { randomSeed, withSeed } from './random';
 import {
   ChannelAlgos,
   generateAcidBass,
@@ -490,22 +491,38 @@ export function applySongStructure(song: Song, structureId: string | null): Song
   };
 }
 
-/** Regenerate one channel in every pattern (keeps everything else). */
+/**
+ * Regenerate one channel in every pattern (keeps everything else).
+ *
+ * The seed is recorded on the song so the same channel can be reproduced
+ * later: rerolling every other channel leaves this one's seed untouched,
+ * which is the freeze-and-reroll loop this exists for.
+ */
 export function regenerateChannelInAllPatterns(
   song: Song,
   channelIndex: number,
-  options: { forceAudible?: boolean } = {}
+  options: { forceAudible?: boolean; seed?: number } = {}
 ): Song {
-  let next: Song = song;
-  for (const label of song.patternOrder) {
-    const { pattern, effects } = regenerateChannel(next, label, channelIndex, options);
-    next = {
-      ...next,
-      patterns: { ...next.patterns, [label]: pattern },
-      patternEffects: { ...next.patternEffects, [label]: effects },
-    };
-  }
-  return next;
+  const seed = options.seed ?? randomSeed();
+
+  const regenerate = (): Song => {
+    let next: Song = song;
+    for (const label of song.patternOrder) {
+      const { pattern, effects } = regenerateChannel(next, label, channelIndex, options);
+      next = {
+        ...next,
+        patterns: { ...next.patterns, [label]: pattern },
+        patternEffects: { ...next.patternEffects, [label]: effects },
+      };
+    }
+    return next;
+  };
+
+  const result = withSeed(seed, regenerate);
+
+  const channelSeeds = [...(song.channelSeeds ?? Array(CHANNEL_COUNT).fill(null))];
+  channelSeeds[channelIndex] = seed;
+  return { ...result, channelSeeds };
 }
 
 /** Notes a lead needs before a learned chain says anything meaningful. */

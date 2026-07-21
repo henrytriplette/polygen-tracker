@@ -11,11 +11,12 @@
 // note byte 48 is C4 (MIDI 60), so: polyendNote = zzfxmNote + 36.
 import JSZip from 'jszip';
 import { ZZFX } from '../engine/zzfx';
-import { CHANNEL_COUNT, isDrumChannel } from '../engine/types';
+import { CH_HAT, CH_KICK, CH_SNARE, CHANNEL_COUNT, isDrumChannel } from '../engine/types';
 import type { Song, NoteEffect } from '../engine/types';
 import {
   AudioUtil,
   Instrument,
+  InstrumentPlayMode,
   Metadata,
   Pattern,
   PatternFX,
@@ -24,7 +25,11 @@ import {
   type FX,
   type StepData,
 } from '../lib/polyend';
+import { buildDrumKit, sliceForChannel } from './drumKit';
 import { buildProjectReadme } from './cheatsheet';
+import { channelInstrumentSettings } from './instrumentSettings';
+import { projectMixSettings } from './projectSettings';
+import { mapEffect } from './fxMap';
 
 export interface PolyendExportOptions {
   /**
@@ -34,6 +39,13 @@ export interface PolyendExportOptions {
    * - 16 = Tracker+ / Mini (8 audio + 8 MIDI)
    */
   trackCount?: 8 | 12 | 16;
+  /**
+   * How the three drum channels become instruments.
+   * - 'separate' = one .pti each (default, and what older exports did)
+   * - 'sliced'   = one sliced .pti triggered by the Slice FX, freeing two
+   *                instrument slots on a device that has a finite sample bank
+   */
+  drumKit?: 'separate' | 'sliced';
 }
 
 
@@ -43,15 +55,41 @@ const POLYEND_C4 = 48;
 // Channels map 1:1 onto the Polyend's audio tracks and instrument slots.
 const CHANNEL_EXPORT_NAMES = ['Lead', 'Harmony', 'Bass', 'Kick', 'Snare', 'Hat', 'Arp', 'Pad'];
 
-function renderInstrumentWav(params: number[], zzfxmNote: number): ArrayBuffer {
+/**
+ * Render one instrument, normalized to a consistent peak.
+ *
+ * Gain staging happens here rather than in the instrument's volume field.
+ * ZzFX renders peak well below full scale, so the boost needed to level them
+ * would exceed the device's volume range (0..2) and every channel would
+ * saturate at the ceiling, erasing the mix. Normalizing the samples also uses
+ * the 16-bit depth properly instead of wasting headroom.
+ */
+const EXPORT_PEAK = 0.89; // just under full scale, leaving room for filter ripple
+
+function renderInstrumentWav(params: number[], zzfxmNote: number): { wav: ArrayBuffer; peak: number } {
   const p = [...params];
   p[2] = (p[2] ?? 0) * 2 ** ((zzfxmNote - 12) / 12);
   const samples = ZZFX.buildSamples(...p);
-  return AudioUtil.createWavFile(new Float32Array(samples), {
-    numChannels: 1,
-    sampleRate: ZZFX.sampleRate,
-    bitsPerSample: 16,
-  });
+
+  let peak = 0;
+  for (const sample of samples) {
+    const abs = sample < 0 ? -sample : sample;
+    if (abs > peak) peak = abs;
+  }
+
+  // A silent render is left alone; scaling it would only amplify nothing.
+  const normalized = new Float32Array(samples.length);
+  const gain = peak > 1e-4 ? EXPORT_PEAK / peak : 1;
+  for (let i = 0; i < samples.length; i++) normalized[i] = samples[i] * gain;
+
+  return {
+    wav: AudioUtil.createWavFile(normalized, {
+      numChannels: 1,
+      sampleRate: ZZFX.sampleRate,
+      bitsPerSample: 16,
+    }),
+    peak,
+  };
 }
 
 function fxByName(name: string): FX['type'] {
@@ -60,44 +98,6 @@ function fxByName(name: string): FX['type'] {
   return record;
 }
 
-// Map the generator's per-note effects onto native Polyend step FX where a
-// meaningful equivalent exists. Unmapped effects simply play clean.
-function mapEffect(effect: NoteEffect): FX | null {
-  const v = effect.value;
-  switch (effect.code) {
-    case 'SU': // slide up, both are 0-255 pitch sweeps
-      return { type: fxByName('Slide Up'), value: Math.min(255, v) };
-    case 'SD':
-      return { type: fxByName('Slide Down'), value: Math.min(255, v) };
-    case 'ST': {
-      // Staccato -> Gate Length %. Generator shortens the envelope by up to 85%.
-      const gate = Math.round((1 - (v / 255) * 0.85) * 100);
-      return { type: fxByName('Gate Length'), value: Math.max(5, Math.min(100, gate)) };
-    }
-    case 'BC': {
-      // Bit crush -> Bit Depth (16 clean .. 1 destroyed). Keep it musical.
-      const depth = Math.round(16 - (v / 255) * 12);
-      return { type: fxByName('Bit Depth'), value: Math.max(4, Math.min(16, depth)) };
-    }
-    case 'VB': {
-      // Vibrato -> Finetune LFO amount (approximation).
-      const depth = (v & 0xf) || 1;
-      return { type: fxByName('Finetune LFO'), value: Math.min(30, depth * 2) };
-    }
-    case 'TR': {
-      // Tremolo -> Volume LFO amount (approximation).
-      const depth = (v & 0xf) || 1;
-      return { type: fxByName('Volume LFO'), value: Math.min(24, Math.max(1, Math.round((depth / 15) * 24))) };
-    }
-    case 'CN':
-      // Chance maps exactly: both are a 0-100 trigger probability, so the
-      // hardware keeps re-rolling this note on every loop.
-      return { type: fxByName('Chance'), value: Math.max(0, Math.min(100, v)) };
-    default:
-      // DT (duty cycle) and PD (pitch drop) have no sample-based equivalent.
-      return null;
-  }
-}
 
 
 function setStep(step: StepData, note: number, instrument: number, effect: NoteEffect | null | undefined): void {
@@ -117,6 +117,7 @@ export function buildPatternData(
   song: Song,
   label: Song['patternOrder'][number],
   trackCount: number,
+  drumKit: 'separate' | 'sliced' = 'separate',
 ): ReturnType<typeof Tracker.createPattern> {
   const source = song.patterns[label];
   const effects = song.patternEffects?.[label];
@@ -142,11 +143,22 @@ export function buildPatternData(
 
       // Drums are one-shot samples: always trigger at the sample's base pitch.
       const polyendNote = isDrumChannel(ch) ? POLYEND_C4 : note + ZZFXM_TO_POLYEND;
-      setStep(step, polyendNote, ch, effect);
+
+      // With a sliced kit all three drum tracks share one instrument and are
+      // told apart by the Slice FX, so it has to be written before anything
+      // else can claim a slot — without it the wrong drum fires.
+      const slice = drumKit === 'sliced' ? sliceForChannel(ch) : null;
+      const instrument = slice === null ? ch : CH_KICK;
+      setStep(step, polyendNote, instrument, effect);
+
+      const freeSlot = () => step.fx.findIndex((f) => f.type.index === noneFx.index);
+      if (slice !== null) {
+        const slot = step.fx[0].type.index === noneFx.index ? 0 : freeSlot();
+        if (slot >= 0) step.fx[slot] = { type: fxByName('Slice'), value: slice };
+      }
 
       // Groove FX in whichever step-FX slots remain free:
       // swing = Micro-move on odd 16ths, humanize = randomized Volume.
-      const freeSlot = () => step.fx.findIndex((f) => f.type.index === noneFx.index);
       if (swing > 0 && row % 2 === 1) {
         const slot = freeSlot();
         if (slot >= 0) step.fx[slot] = { type: fxByName('Micro-move'), value: Math.min(100, Math.round(swing)) };
@@ -167,10 +179,11 @@ export function buildPatternData(
 /** Zip containing only the pattern files (pattern_01.mtp, ...), no project/instruments. */
 export async function buildPatternsZip(song: Song, options: PolyendExportOptions = {}): Promise<Blob> {
   const trackCount = options.trackCount ?? 12;
+  const drumKit = options.drumKit ?? 'separate';
   const zip = new JSZip();
 
   song.patternOrder.forEach((label, patternIdx) => {
-    const pattern = buildPatternData(song, label, trackCount);
+    const pattern = buildPatternData(song, label, trackCount, drumKit);
     zip.file(`pattern_${String(patternIdx + 1).padStart(2, '0')}.mtp`, Pattern.write(pattern));
   });
 
@@ -181,17 +194,42 @@ export async function buildPatternsZip(song: Song, options: PolyendExportOptions
 
 export async function buildPolyendProjectZip(song: Song, options: PolyendExportOptions = {}): Promise<Blob> {
   const trackCount = options.trackCount ?? 12;
+  const drumKit = options.drumKit ?? 'separate';
   const zip = new JSZip();
 
   // --- Instruments ------------------------------------------------------
   // One .pti per channel, rendered at its base pitch; the hardware repitches
   // melodic samples from the note column and plays drums one-shot.
+  const kit = drumKit === 'sliced' ? buildDrumKit(song) : null;
+
   CHANNEL_EXPORT_NAMES.forEach((name, ch) => {
+    // A sliced kit occupies the kick's slot and replaces the snare and hat
+    // instruments entirely, freeing two slots in the sample bank.
+    if (kit && (ch === CH_SNARE || ch === CH_HAT)) return;
+
+    if (kit && ch === CH_KICK) {
+      const inst = Tracker.createInstrument(kit.wav);
+      inst.sample.filename = 'Drums';
+      Object.assign(inst, channelInstrumentSettings(song, CH_KICK, kit.peak));
+      inst.playmode = InstrumentPlayMode.Slice;
+      inst.numSlices = kit.sliceCount;
+      kit.slicePoints.forEach((point, index) => {
+        inst.slices[index] = point;
+      });
+      zip.file(`instruments/${String(ch + 1).padStart(2, '0')} Drums.pti`, Instrument.write(inst));
+      return;
+    }
+
     const params = song.instruments[ch];
     if (!params) return;
-    const wav = renderInstrumentWav(params, 12);
+    const { wav, peak } = renderInstrumentWav(params, 12);
     const inst = Tracker.createInstrument(wav);
     inst.sample.filename = name;
+
+    // Mixer settings: gain staging, stereo placement, sends and filtering.
+    // Without these every instrument lands at unity, centred and dry.
+    Object.assign(inst, channelInstrumentSettings(song, ch, peak));
+
     zip.file(
       `instruments/${String(ch + 1).padStart(2, '0')} ${name}.pti`,
       Instrument.write(inst)
@@ -202,7 +240,7 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   const patternNames: string[] = [];
 
   song.patternOrder.forEach((label, patternIdx) => {
-    const pattern = buildPatternData(song, label, trackCount);
+    const pattern = buildPatternData(song, label, trackCount, drumKit);
     const role = song.patternRoles[label] ?? 'verse';
     patternNames.push(`${label} ${role}`.substring(0, 30));
     zip.file(`patterns/pattern_${String(patternIdx + 1).padStart(2, '0')}.mtp`, Pattern.write(pattern));
@@ -213,6 +251,10 @@ export async function buildPolyendProjectZip(song: Song, options: PolyendExportO
   // --- Project ----------------------------------------------------------
   const project = Tracker.createProject(song.config.name || 'polygen');
   project.values.globalTempo = song.config.bpm;
+
+  // Global send effects. Instrument sends do nothing until these are unmuted
+  // and given a level, so the two settings must travel together.
+  Object.assign(project.values, projectMixSettings(song));
   project.values.trackNames = [
     ...CHANNEL_EXPORT_NAMES,
     ...project.values.trackNames.slice(CHANNEL_EXPORT_NAMES.length),

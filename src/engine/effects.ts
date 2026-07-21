@@ -53,6 +53,13 @@ export function applyEffect(baseParams: ZzFXSound, effect: NoteEffect): ZzFXSoun
       p[19] = (tDepth / 15) * 0.7;
       break;
     }
+    case 'GL': // Glide — approximate a portamento into the note with a slide
+      p[8] = (v / 255) * 0.5;
+      break;
+
+    // Device-only FX (RL AR RN RI RX LP HP PN DS RS RP) intentionally fall
+    // through: the Tracker performs them, the ZzFX preview cannot, and faking
+    // them would make the app disagree with the export. See src/export/fxMap.ts.
   }
 
   return p;
@@ -73,6 +80,21 @@ export const FX_VALUES: Record<EffectCode, number> = {
   BC: 0x18,  // subtle crunch (~1575 Hz effective SR)
   TR: 0x46,  // ~5 Hz tremolo, moderate depth
   CN: 50,    // coin-flip trigger chance (0-100, matching Polyend's Chance FX)
+
+  // Device-only FX: defaults sit low in each range so hand-placing one is a
+  // nudge rather than a surprise the app cannot play back.
+  GL: 0x40,  // gentle portamento
+  RL: 0x20,  // a few retriggers, not a buzz
+  AR: 0x10,  // slow arpeggio
+  RN: 25,    // occasional random pitch
+  RI: 25,    // occasional instrument swap
+  RX: 0x40,  // moderate randomisation of the other FX slot
+  LP: 0x60,  // partly closed low-pass
+  HP: 0x40,  // light high-pass
+  PN: 0x80,  // centre (0..255 maps onto the device's 0..100 store)
+  DS: 0x50,  // modest delay send
+  RS: 0x50,  // modest reverb send
+  RP: 1,     // reverse is a switch, not an amount
 };
 
 // Drums need a heavier pitch drop for audible thump
@@ -210,7 +232,10 @@ const ROLE_BUDGETS: Record<SectionRole, [number, number, number, number]> = {
 // This maps effect codes to the kinds of positions they sound best at.
 type PositionType = 'phraseStart' | 'phraseEnd' | 'heldNote';
 
-const EFFECT_POSITIONS: Record<EffectCode, PositionType[]> = {
+// Only the codes the generator places automatically appear here. The
+// device-only FX are user-applied, so they have no preferred position — a
+// lookup miss means "never auto-place this".
+const EFFECT_POSITIONS: Partial<Record<EffectCode, PositionType[]>> = {
   SU: ['phraseStart'],            // scoop into the note
   SD: ['phraseEnd'],              // slide down to rest
   VB: ['heldNote', 'phraseStart'], // sustain wobble, or opening note color
@@ -327,7 +352,8 @@ export function generateChannelEffects(
   const positions = classifyPositions(notes);
 
   // Find candidates for the primary effect
-  const primaryTypes = EFFECT_POSITIONS[primaryEffect];
+  // A code with no preferred positions is never auto-placed.
+  const primaryTypes = EFFECT_POSITIONS[primaryEffect] ?? [];
   let primaryCandidates: number[] = [];
   for (const pType of primaryTypes) {
     primaryCandidates = primaryCandidates.concat(positions[pType]);
@@ -345,7 +371,7 @@ export function generateChannelEffects(
   // Select positions for secondary effect (from different position types)
   let secondaryPositions: number[] = [];
   if (useSecondary && secondaryEffect && secondaryBudget > 0) {
-    const secondaryTypes = EFFECT_POSITIONS[secondaryEffect];
+    const secondaryTypes = EFFECT_POSITIONS[secondaryEffect] ?? [];
     let secondaryCandidates: number[] = [];
     for (const pType of secondaryTypes) {
       secondaryCandidates = secondaryCandidates.concat(positions[pType]);

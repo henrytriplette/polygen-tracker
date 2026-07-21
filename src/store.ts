@@ -42,7 +42,14 @@ import {
 import type { PatternLength } from './engine';
 
 export { PATTERN_LENGTHS };
-import type { ChannelAlgos, ChordMode, NoteEffect, Pattern, PatternEffects } from './engine';
+import {
+  DEFAULT_FRAGMENT_COUNT,
+  applyFragment,
+  fragmentPreviewSong,
+  generateFragments,
+  macroToTransform,
+} from './engine';
+import type { ChannelAlgos, ChordMode, Fragment, MacroStep, NoteEffect, Pattern, PatternEffects } from './engine';
 import type { NoteName, PatternLabel, ScaleName, Song, SongLength, VibeName } from './engine';
 
 // Selectable timbre palette per channel (re-exported from the engine so the
@@ -103,6 +110,7 @@ export const CHANNEL_ALGO_OPTIONS: { value: string; label: string }[][] = [
   PAD_ALGOS,
 ];
 import { downloadPolyendPatterns, downloadPolyendProject, sanitizeProjectName } from './export/polyend';
+import { buildPaletteZip } from './export/palette';
 import { buildMidiFile } from './export/midi';
 import { songFromHash, songToHash } from './share';
 import { Tracker } from './lib/polyend';
@@ -172,6 +180,8 @@ interface StoreState {
   muted: boolean[];
   solo: number | null;
   exportDevice: 8 | 12 | 16;
+  /** Whether drums export as three instruments or one sliced kit. */
+  exportDrumKit: 'separate' | 'sliced';
   isExporting: boolean;
   snapToScale: boolean;
   projects: SavedProject[];
@@ -179,6 +189,10 @@ interface StoreState {
   redoCount: number;
   seedInput: string;
   lastSeed: number | null;
+  /** Candidate one-bar ideas awaiting audition; starred ones survive a reroll. */
+  fragments: Fragment[];
+  fragmentChannel: number;
+  fragmentPlaying: string | null;
   follow: boolean;
   shareStatus: '' | 'copied' | 'failed';
   /** Channel the instrument panel should follow (set by the grid cursor). */
@@ -198,6 +212,7 @@ const state = reactive<StoreState>({
   muted: Array(CHANNEL_COUNT).fill(false),
   solo: null,
   exportDevice: 12,
+  exportDrumKit: 'separate',
   isExporting: false,
   snapToScale: true,
   projects: listProjects(),
@@ -205,6 +220,9 @@ const state = reactive<StoreState>({
   redoCount: 0,
   seedInput: '',
   lastSeed: null,
+  fragments: [],
+  fragmentChannel: 0,
+  fragmentPlaying: null,
   follow: false,
   shareStatus: '',
   instrumentChannel: null,
@@ -786,6 +804,43 @@ export const store = {
     commitPattern(label, pattern, effects);
   },
 
+  /**
+   * Apply a transform chain to every selected channel's notes.
+   *
+   * Each channel is transformed independently over just the selected rows, so
+   * a retrograde reverses within the selection rather than across the pattern.
+   * Drum channels are skipped for pitch-changing transforms only — rhythmic
+   * ones (retrograde, rotate, thin) apply to them meaningfully.
+   */
+  applyTransform(block: BlockRect, steps: MacroStep[]): void {
+    if (steps.length === 0) return;
+    const { pattern, effects, label, rows } = editablePattern();
+    const transform = macroToTransform(steps);
+    const pitched = steps.some((s) => s.id === 'transpose' || s.id === 'invert');
+
+    let changed = false;
+    for (let ch = block.chStart; ch <= block.chEnd; ch++) {
+      if (pitched && isDrumChannel(ch)) continue;
+
+      const rowEnd = Math.min(block.rowEnd, rows - 1);
+      if (rowEnd < block.rowStart) continue;
+
+      const slice: number[] = [];
+      for (let row = block.rowStart; row <= rowEnd; row++) slice.push(pattern[ch][row + 2] ?? 0);
+
+      const result = transform(slice);
+      for (let i = 0; i < slice.length; i++) {
+        // Clamp into the playable range rather than letting a chain drift a
+        // note out of the octave the instruments are rendered for.
+        const next = result[i] > 0 ? Math.max(1, Math.min(48, Math.round(result[i]))) : 0;
+        if (next !== slice[i]) changed = true;
+        pattern[ch][block.rowStart + i + 2] = next;
+      }
+    }
+    if (!changed) return;
+    commitPattern(label, pattern, effects);
+  },
+
   /** Write or clear one step effect in the selected pattern. */
   setEffect(ch: number, row: number, effect: NoteEffect | null): void {
     if (ch < 0 || ch >= CHANNEL_COUNT || row < 0 || row >= patternRows()) return;
@@ -825,6 +880,87 @@ export const store = {
     params[2] = (params[2] ?? 0) * 2 ** ((note - 12) / 12);
     const samples = ZZFX.buildSamples(...params);
     zzfxP([samples], 0.6);
+  },
+
+  // --- Fragment bank ---
+
+  /** Generate a fresh batch of one-bar candidates for a channel. */
+  generateFragments(ch: number): void {
+    state.fragmentChannel = ch;
+    // Starred candidates survive a reroll — that is the point of starring.
+    const kept = state.fragments.filter((f) => f.starred && f.channel === ch);
+    const fresh = generateFragments(
+      state.song,
+      state.selectedPattern,
+      ch,
+      Math.max(1, DEFAULT_FRAGMENT_COUNT - kept.length)
+    );
+    state.fragments = [...kept, ...fresh];
+    state.fragmentPlaying = null;
+  },
+
+  toggleFragmentStar(id: string): void {
+    state.fragments = state.fragments.map((f) => (f.id === id ? { ...f, starred: !f.starred } : f));
+  },
+
+  clearFragments(): void {
+    state.fragments = [];
+    state.fragmentPlaying = null;
+  },
+
+  /**
+   * Export the candidates as a project where each pattern is one idea, to be
+   * auditioned on the device. Starred candidates go alone if there are any;
+   * otherwise the whole batch does.
+   */
+  async exportPalette(): Promise<void> {
+    if (state.isExporting) return;
+    const starred = state.fragments.filter((f) => f.starred);
+    const chosen = starred.length ? starred : state.fragments;
+    if (chosen.length === 0) return;
+
+    state.isExporting = true;
+    try {
+      const blob = await buildPaletteZip(state.song, chosen, { trackCount: state.exportDevice, drumKit: state.exportDrumKit });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${sanitizeProjectName(state.song.config.name)}-ideas.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } finally {
+      state.isExporting = false;
+    }
+  },
+
+  /** Audition one candidate alone, with every other channel silenced. */
+  auditionFragment(id: string): void {
+    const fragment = state.fragments.find((f) => f.id === id);
+    if (!fragment) return;
+    state.fragmentPlaying = id;
+    const preview = fragmentPreviewSong(state.song, fragment);
+    const buffers = renderSongBuffers(preview);
+    if (buffers[0]) zzfxP(buffers[0], 0.8);
+    // Clear the indicator after roughly one bar at the song's tempo.
+    const barMs = (60000 / state.song.config.bpm) * 4;
+    window.setTimeout(() => {
+      if (state.fragmentPlaying === id) state.fragmentPlaying = null;
+    }, barMs);
+  },
+
+  /** Drop a candidate into the selected pattern, tiled across its length. */
+  applyFragment(id: string): void {
+    const fragment = state.fragments.find((f) => f.id === id);
+    if (!fragment) return;
+    const label = state.selectedPattern;
+    const { pattern, effects } = applyFragment(state.song, label, fragment);
+    state.song = {
+      ...state.song,
+      patterns: { ...state.song.patterns, [label]: pattern },
+      patternEffects: { ...state.song.patternEffects, [label]: effects },
+    };
+    swapAudio();
   },
 
   // --- Instrument editing ---
@@ -883,17 +1019,33 @@ export const store = {
     swapAudio();
   },
 
-  /** Regenerate one channel in every pattern of the song. */
-  regenChannelAll(ch: number): void {
-    state.song = regenerateChannelInAllPatterns(state.song, ch);
+  /**
+   * Regenerate one channel in every pattern of the song.
+   *
+   * Passing a seed reproduces a previous reroll exactly; omitting it rolls a
+   * new one and records it, so any result can be returned to later.
+   */
+  regenChannelAll(ch: number, seed?: number): void {
+    state.song = regenerateChannelInAllPatterns(state.song, ch, { seed });
     swapAudio();
+  },
+
+  /** Re-run a channel's last reroll — same seed, same result. */
+  replayChannelSeed(ch: number): void {
+    const seed = state.song.channelSeeds?.[ch];
+    if (typeof seed !== 'number') return;
+    this.regenChannelAll(ch, seed);
+  },
+
+  channelSeed(ch: number): number | null {
+    return state.song.channelSeeds?.[ch] ?? null;
   },
 
   async exportPolyend(): Promise<void> {
     if (state.isExporting) return;
     state.isExporting = true;
     try {
-      await downloadPolyendProject(state.song, { trackCount: state.exportDevice });
+      await downloadPolyendProject(state.song, { trackCount: state.exportDevice, drumKit: state.exportDrumKit });
     } finally {
       state.isExporting = false;
     }
@@ -1054,7 +1206,7 @@ export const store = {
     if (state.isExporting) return;
     state.isExporting = true;
     try {
-      await downloadPolyendPatterns(state.song, { trackCount: state.exportDevice });
+      await downloadPolyendPatterns(state.song, { trackCount: state.exportDevice, drumKit: state.exportDrumKit });
     } finally {
       state.isExporting = false;
     }

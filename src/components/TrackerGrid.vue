@@ -314,7 +314,13 @@ function hasNote(ch: number, row: number): boolean {
                 @click="store.toggleSolo(ch)"
               >S</button>
               <button class="mini" title="Regenerate/populate this channel in the selected pattern" @click="store.regenChannel(ch)">↻</button>
-              <button class="mini" title="Regenerate this channel in ALL patterns" @click="store.regenChannelAll(ch)">↻*</button>
+              <button class="mini" title="Regenerate this channel in ALL patterns (new seed)" @click="store.regenChannelAll(ch)">↻*</button>
+              <button
+                v-if="store.channelSeed(ch) !== null"
+                class="mini seed"
+                :title="`Replay this channel's last reroll — seed ${store.channelSeed(ch)}`"
+                @click="store.replayChannelSeed(ch)"
+              >⟲</button>
             </span>
             <select
               class="ch-vibe"
@@ -476,6 +482,10 @@ th {
   color: #000;
   border-color: var(--accent);
 }
+
+/* Only appears once a channel has a seed to replay — reproduction is a
+   reference, not an action, so it stays visually quieter than the rerolls. */
+.mini.seed { color: var(--ref); }
 
 .ch-vibe {
   display: block;

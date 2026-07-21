@@ -134,8 +134,10 @@ export async function runPatternsRoundtrip(existingSong?: Song, trackCount: 8 | 
   const paths = Object.keys(zip.files).filter((p) => !zip.files[p].dir).sort();
   info.paths = paths;
 
-  if (paths.length !== song.patternOrder.length) {
-    errors.push(`expected ${song.patternOrder.length} .mtp files, got ${paths.length}`);
+  // Count pattern files specifically: the zip also carries the README.
+  const mtpPaths = paths.filter((p) => p.toLowerCase().endsWith('.mtp'));
+  if (mtpPaths.length !== song.patternOrder.length) {
+    errors.push(`expected ${song.patternOrder.length} .mtp files, got ${mtpPaths.length}`);
   }
   if (paths.some((p) => p.includes('/'))) {
     errors.push('patterns zip should be flat (no folders)');

@@ -16,6 +16,12 @@ const state = store.state;
 const open = ref(false);
 const channel = ref(0);
 
+// The per-group explanations are worth having but cost a block of vertical
+// space on every group. Off by default, one click away — the panel stays
+// compact for someone who knows the parameters and stays teachable for
+// someone who doesn't.
+const hints = ref(false);
+
 const params = computed(() => state.song.instruments[channel.value] ?? []);
 const locked = computed(() => state.song.lockedInstruments?.[channel.value] ?? false);
 
@@ -103,6 +109,12 @@ watch(
       </div>
 
       <div v-if="open" class="actions">
+        <button
+          class="act"
+          :class="{ on: hints }"
+          :title="hints ? 'Hide the parameter explanations' : 'Explain what each group does to the sound'"
+          @click="hints = !hints"
+        >?</button>
         <select class="sound" :value="state.song.channelSounds?.[channel] ?? ''" title="Base timbre" @change="onSound">
           <option value="">AUTO</option>
           <option v-for="s in CHANNEL_SOUND_OPTIONS[channel]" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -135,8 +147,8 @@ watch(
       </div>
 
       <div v-for="group in PARAM_GROUPS" :key="group.id" class="group">
-        <span class="group-title">{{ group.label }}</span>
-        <p class="group-desc">{{ group.description }}</p>
+        <span class="group-title" :title="group.description">{{ group.label }}</span>
+        <p v-if="hints" class="group-desc">{{ group.description }}</p>
         <label v-for="def in paramsInGroup(group.id)" :key="def.index" class="param" :title="def.hint">
           <span class="p-label">{{ def.label }}</span>
           <input
@@ -166,7 +178,7 @@ watch(
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 5px 10px;
+  padding: 4px 10px;
 }
 
 .toggle {
@@ -229,9 +241,9 @@ watch(
 
 .body {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 4px 10px 9px;
+  padding: 3px 10px 6px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -242,8 +254,8 @@ watch(
 }
 
 .env-svg {
-  width: 200px;
-  height: 46px;
+  width: 150px;
+  height: 34px;
   background: var(--bg);
   border: 1px solid var(--border-subtle);
   border-radius: 3px;
@@ -258,8 +270,12 @@ watch(
 .group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 172px;
+  gap: 1px;
+  /* Wide enough that the slider stays grabbable. When the window cannot fit
+     all four groups beside the envelope they wrap to a second row, which is
+     better than squeezing every slider to a few dozen pixels. */
+  min-width: 150px;
+  flex: 1 1 150px;
 }
 
 .group-title {
@@ -270,26 +286,22 @@ watch(
   margin-bottom: 1px;
 }
 
-/* Explanatory text, not a control: dimmer than the labels below it. The fixed
-   height keeps the slider rows aligned across groups even though the lines
-   wrap differently. */
+/* Explanatory text, not a control: dimmer than the labels below it. Shown only
+   when the ? toggle is on, so the default panel stays compact. */
 .group-desc {
   font-size: 9px;
   line-height: 1.5;
   color: var(--text-dim);
-  margin-bottom: 6px;
-  min-height: 40px;
-  /* Cap the width so a one-line description cannot stretch its column and
-     push the last group onto a row of its own. */
-  max-width: 250px;
+  margin-bottom: 4px;
+  max-width: 230px;
 }
 
 .sample {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 3px;
-  max-width: 200px;
+  margin-top: 2px;
+  max-width: 150px;
 }
 
 .s-size {
@@ -308,10 +320,11 @@ watch(
 
 .param {
   display: grid;
-  grid-template-columns: 52px 1fr 52px;
+  grid-template-columns: 44px minmax(0, 1fr) 42px;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   cursor: pointer;
+  height: 15px;
 }
 
 .p-label {
@@ -329,6 +342,9 @@ watch(
 
 input[type='range'] {
   appearance: none;
+  /* Let the slider shrink with its column instead of forcing the row wide. */
+  min-width: 0;
+  width: 100%;
   height: 3px;
   background: var(--field);
   border-radius: 2px;

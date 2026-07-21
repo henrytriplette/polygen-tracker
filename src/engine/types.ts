@@ -26,9 +26,20 @@ export type PatternLabel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 // that the note triggers at all. Playback re-rolls it on every render, and it
 // maps to the Polyend's native Chance FX, so an exported project stays
 // generative on the hardware.
-export type EffectCode = 'SU' | 'SD' | 'VB' | 'DT' | 'ST' | 'PD' | 'BC' | 'TR' | 'CN';
+// Codes fall into three groups, spelled out in src/export/fxMap.ts:
+//   - previewable and exported (SU SD VB ST BC TR CN GL)
+//   - exported but device-only, silent in the app preview (RL AR RN RI RX
+//     LP HP PN DS RS RP)
+//   - previewable but with no device equivalent, dropped on export (DT PD)
+export type EffectCode =
+  | 'SU' | 'SD' | 'VB' | 'DT' | 'ST' | 'PD' | 'BC' | 'TR' | 'CN' | 'GL'
+  | 'RL' | 'AR' | 'RN' | 'RI' | 'RX' | 'LP' | 'HP' | 'PN' | 'DS' | 'RS' | 'RP';
 
-export const EFFECT_CODES: EffectCode[] = ['SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR'];
+/** Codes offered in the FX lane, in entry order. */
+export const EFFECT_CODES: EffectCode[] = [
+  'SU', 'SD', 'VB', 'DT', 'ST', 'PD', 'BC', 'TR',
+  'CN', 'GL', 'RL', 'AR', 'RN', 'RI', 'RX', 'LP', 'HP', 'PN', 'DS', 'RS', 'RP',
+];
 
 export interface NoteEffect {
   code: EffectCode;
@@ -221,6 +232,16 @@ export interface Song {
   structureId?: string | null;
   /** Per-channel: keep this instrument when regenerating the song. */
   lockedInstruments?: boolean[];
+  /**
+   * Seed of the last reroll of each channel, so any single channel can be
+   * reproduced without regenerating the song. Null means the channel came
+   * from the whole-song generation pass and has no seed of its own.
+   *
+   * Note the deliberate scope: whole-song generation still runs under one
+   * master seed with the channels interleaved, so these seeds reproduce a
+   * *reroll*, not a channel's share of the original generation.
+   */
+  channelSeeds?: (number | null)[];
   /** How chord progressions are chosen: curated pools, or a Markov walk. */
   chordMode?: ChordMode;
 }

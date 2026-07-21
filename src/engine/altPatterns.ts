@@ -25,6 +25,23 @@ export type PadAlgo = 'sustain' | 'swell' | 'stab';
 /** Per-channel algorithm override (one entry per channel): null = vibe default. */
 export type ChannelAlgos = (string | null)[];
 
+/**
+ * Every algorithm available to each channel, in CHANNELS order. The engine
+ * owns this list so callers that need to enumerate algorithms — the fragment
+ * bank spans them to get variety — cannot drift from what actually exists.
+ * The UI adds display labels on top of these ids.
+ */
+export const CHANNEL_ALGO_IDS: string[][] = [
+  ['walk', 'arp', 'riff', 'markov', 'markovLearn', 'lsystem', 'motif'], // lead
+  ['gapfill', 'stabs', 'arp', 'pedal'],                                 // harmony
+  ['groove', 'acid', 'arp', 'offbeat', 'poly'],                         // bass
+  ['template', 'euclid', 'break', 'four', 'automata'],                  // kick
+  ['template', 'euclid', 'break', 'four', 'automata'],                  // snare
+  ['template', 'euclid', 'break', 'four', 'automata'],                  // hat
+  ['updown', 'octaves', 'random', 'poly'],                              // arp
+  ['sustain', 'swell', 'stab'],                                         // pad
+];
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }

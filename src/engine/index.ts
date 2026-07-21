@@ -24,6 +24,30 @@ export {
 } from './instrumentParams';
 export type { ParamDef, ParamGroup, SampleReport, SampleWarning } from './instrumentParams';
 export { withSeed, randomSeed } from './random';
+export {
+  DEFAULT_FRAGMENT_COUNT,
+  FRAGMENT_ROWS,
+  applyFragment,
+  fragmentPreviewSong,
+  generateFragments,
+} from './fragments';
+export type { Fragment } from './fragments';
+export {
+  TRANSFORMS,
+  chain,
+  describeMacro,
+  findTransform,
+  macroToTransform,
+  transpose,
+  invert,
+  retrograde,
+  augment,
+  diminish,
+  rotate,
+  thin,
+  snapToScale,
+} from './algebra';
+export type { MacroStep, NoteRow, Transform, TransformDef } from './algebra';
 export type { StructureOption } from './structures';
 export type { ChannelAlgos, LeadAlgo, HarmonyAlgo, BassAlgo, DrumAlgo } from './altPatterns';
 export { generateInstruments, generateInstrumentForChannel, CHANNEL_SOUND_OPTIONS } from './instruments';

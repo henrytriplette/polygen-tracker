@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { store } from '../store';
-import { CHORDS_PER_PATTERN, chordDisplayName } from '../engine';
+import { CHORDS_PER_PATTERN, chordDisplayName, rowsPerChord } from '../engine';
 import type { ChordMode } from '../engine';
 
 const state = store.state;
@@ -18,6 +18,16 @@ function nameFor(degree: number): string {
   return chordDisplayName(degree, state.song.config.key, state.song.config.scale);
 }
 
+/**
+ * Rows this chord covers. Derived from the pattern length rather than assumed:
+ * the progression always divides the pattern into four, so a 64-row pattern
+ * gives each chord 16 rows, not the 8 a 32-row pattern does.
+ */
+function rowRange(slot: number): string {
+  const per = rowsPerChord(state.song.config.patternLength ?? 32);
+  return `${slot * per}-${slot * per + per - 1}`;
+}
+
 function onChord(slot: number, e: Event) {
   store.setChordDegree(slot, Number((e.target as HTMLSelectElement).value));
 }
@@ -32,8 +42,7 @@ function onMode(e: Event) {
     <span class="chords-title">CHORDS {{ state.selectedPattern }}</span>
     <div class="chord-slots">
       <label v-for="(deg, slot) in degrees" :key="slot" class="chord-slot">
-        <span class="bars">{{ slot * 8 }}-{{ slot * 8 + 7 }}</span>
-        <select :value="deg" @change="onChord(slot, $event)">
+        <select :value="deg" :title="`Rows ${rowRange(slot)}`" @change="onChord(slot, $event)">
           <option v-for="(r, d) in ROMAN" :key="d" :value="d">
             {{ r }} · {{ nameFor(d) }}
           </option>
@@ -58,9 +67,9 @@ function onMode(e: Event) {
 .chords {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 7px 10px;
+  padding: 4px 10px;
   background: var(--panel);
   border-radius: 4px;
   box-shadow: var(--shadow-raise);
@@ -80,14 +89,6 @@ function onMode(e: Event) {
 
 .chord-slot {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bars {
-  font-size: 9px;
-  color: var(--text-faint);
-  text-align: center;
 }
 
 .chord-slot select {
@@ -96,7 +97,7 @@ function onMode(e: Event) {
   background: var(--field);
   color: var(--fx);
   border: 1px solid var(--border);
-  padding: 4px 6px;
+  padding: 2px 6px;
   box-shadow: var(--shadow-inset);
   cursor: pointer;
 }
@@ -106,13 +107,12 @@ function onMode(e: Event) {
 .mode {
   font-family: var(--mono);
   font-size: 10px;
-  padding: 4px 6px;
+  padding: 2px 6px;
   background: var(--field);
   color: var(--fx);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-inset);
   cursor: pointer;
-  align-self: flex-end;
 }
 
 .mode:hover { background: var(--field-hover); border-color: var(--fx); }

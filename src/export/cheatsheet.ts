@@ -9,6 +9,7 @@ import { CHANNELS, isDrumChannel } from '../engine/types';
 import type { EffectCode, NoteEffect, PatternLabel, Song, VibeName } from '../engine/types';
 import { chordDisplayName } from '../engine/chords';
 import { findStructure } from '../engine/structures';
+import { EFFECT_MAP } from './fxMap';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 
@@ -60,21 +61,9 @@ const VIBE_NOTES: Record<VibeName, string> = {
   punk: 'Fast, loud, three chords, no ornament. Energy over polish.',
 };
 
-/** What each generator effect becomes on the device — and what it sounds like. */
-const FX_NOTES: Record<EffectCode, { polyend: string; what: string }> = {
-  SU: { polyend: 'Slide Up', what: 'bends the pitch upward from the note — a rising sweep' },
-  SD: { polyend: 'Slide Down', what: 'bends the pitch downward — a falling sweep or drop' },
-  ST: { polyend: 'Gate Length', what: 'cuts the note short, making it clipped and staccato' },
-  BC: { polyend: 'Bit Depth', what: 'crushes the sample to fewer bits — dirty and lo-fi' },
-  VB: { polyend: 'Finetune LFO', what: 'wobbles the pitch continuously — vibrato' },
-  TR: { polyend: 'Volume LFO', what: 'pulses the volume — tremolo' },
-  CN: {
-    polyend: 'Chance',
-    what: 'a percentage chance the note plays at all, re-rolled every loop, so the pattern keeps changing on the device',
-  },
-  DT: { polyend: '', what: 'duty-cycle change (a pulse-width timbre shift)' },
-  PD: { polyend: '', what: 'a fast downward pitch drop at the start of the note' },
-};
+// What each effect becomes on the device is described once, in the same table
+// the exporter maps from, so this can never describe a mapping that changed.
+const FX_NOTES = EFFECT_MAP;
 
 function fmtTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -236,6 +225,21 @@ function fxSection(song: Song): string {
     out.push(
       wrap(
         'Chance is the interesting one: those steps are not fixed. The device rolls the dice every time the pattern loops, so the track keeps varying while it plays. Try raising or lowering the percentage.'
+      )
+    );
+  }
+
+  const deviceOnly = [...counts.keys()].filter(
+    (code) => FX_NOTES[code]?.polyend && !FX_NOTES[code]?.previewable
+  );
+  if (deviceOnly.length) {
+    out.push(
+      wrap(
+        `${deviceOnly.map((c) => FX_NOTES[c].polyend).join(', ')} ${
+          deviceOnly.length === 1 ? 'is performed' : 'are performed'
+        } by the Tracker itself, so ${
+          deviceOnly.length === 1 ? 'it is' : 'they are'
+        } silent in the app that made this and audible only here. If the project sounds richer on the device than it did on screen, that is why.`
       )
     );
   }
