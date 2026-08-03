@@ -116,6 +116,11 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
       <input class="name-input" :value="state.song.config.name" spellcheck="false" @change="onName" />
       <Oscilloscope />
       <div class="spacer" />
+      <button
+        class="btn theme-toggle"
+        :title="state.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        @click="store.toggleTheme()"
+      >{{ state.theme === 'dark' ? '☀' : '☾' }}</button>
       <button class="btn" :disabled="!state.undoCount" title="Undo (Ctrl+Z)" @click="store.undo()">↶</button>
       <button class="btn" :disabled="!state.redoCount" title="Redo (Ctrl+Y)" @click="store.redo()">↷</button>
       <button class="btn" title="Small variation of the selected pattern" @click="store.mutate()">🧬 MUTATE</button>
@@ -342,24 +347,37 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey));
   flex-wrap: wrap;
 }
 
-/* --- Header: highest emphasis layer -------------------------------------- */
+/* --- Header: sits directly on the ground, no card ------------------------ */
 header.bar {
-  background: var(--panel-raised);
-  border-radius: 4px;
-  padding: 7px 10px;
-  box-shadow: var(--shadow-raise);
+  background: transparent;
+  padding: 4px 4px 2px;
 }
 
 .brand {
-  font-family: var(--mono);
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--display);
+  font-size: 22px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text-bright);
   margin: 0;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+}
+
+/* Nothing-style mark: a small red LED dot ahead of the wordmark. */
+.brand::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .brand span { color: var(--text-dim); font-weight: 400; }
+
+.theme-toggle { min-width: 34px; text-align: center; font-size: 14px; }
 
 .name-input {
   font-family: var(--mono);
@@ -403,6 +421,7 @@ header.bar {
 }
 
 .group-label {
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
   color: var(--text-faint);
@@ -483,19 +502,20 @@ select:focus,
 /* --- Buttons: layered affordances ---------------------------------------- */
 .btn {
   font-family: var(--mono);
-  font-size: 12px;
-  padding: 6px 11px;
-  background: var(--field);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  padding: 7px 13px;
+  background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: var(--shadow-raise);
 }
 
-.btn:hover { background: var(--field-hover); border-color: var(--border-strong); }
-.btn:active { box-shadow: var(--shadow-inset); }
-.btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.btn:hover { background: var(--field); border-color: var(--border-strong); }
+.btn:active { background: var(--field-hover); }
+.btn:disabled { opacity: 0.4; cursor: default; }
 
 /* GENERATE — a primary action, gets the orange */
 .btn.primary {
@@ -504,32 +524,31 @@ select:focus,
   font-weight: 600;
 }
 
-.btn.primary:hover { background: var(--accent); color: #000; }
+.btn.primary:hover { background: var(--accent); color: var(--on-accent); }
 
-/* PLAY — the most alive control on screen */
+/* PLAY — neutral outline at rest, red + pulsing while live */
 .btn.play {
-  border-color: var(--ch-lead);
-  color: var(--ch-lead);
+  border-color: var(--border-strong);
+  color: var(--text-bright);
   font-weight: 700;
   min-width: 92px;
   padding: 6px 14px;
   letter-spacing: 1px;
-  background: linear-gradient(180deg, rgba(93, 217, 124, 0.12), rgba(93, 217, 124, 0.04));
 }
 
-.btn.play:hover { background: var(--ch-lead); color: #000; }
+.btn.play:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 .btn.play.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #000;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(255, 138, 42, 0.5);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 14px var(--accent-glow);
   animation: play-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes play-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 10px rgba(255, 138, 42, 0.35); }
-  50% { box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(255, 138, 42, 0.6); }
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 8px var(--accent-glow); }
+  50% { box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--accent-glow); }
 }
 
 .btn.mini { padding: 4px 7px; font-size: 11px; box-shadow: none; }
@@ -569,11 +588,12 @@ select:focus,
   color: var(--text);
 }
 
-.export .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+.export .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .export select { font-size: 11px; padding: 4px 6px; }
 
 .export-title {
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
   color: var(--text-faint);

@@ -15,12 +15,17 @@ function draw() {
 
   const w = el.width;
   const h = el.height;
-  ctx.fillStyle = '#14161c';
+  // Read the live theme tokens so the trace follows light/dark.
+  const cs = getComputedStyle(el);
+  ctx.fillStyle = cs.getPropertyValue('--panel').trim() || '#141414';
   ctx.fillRect(0, 0, w, h);
 
   const analyser = store.state.isPlaying ? store.getAnalyser() : null;
-  // Orange only while playing (play state); flat idle trace stays neutral.
-  ctx.strokeStyle = analyser ? '#ff8a2a' : '#464a54';
+  // Accent only while playing (play state); flat idle trace stays neutral.
+  ctx.strokeStyle = (analyser
+    ? cs.getPropertyValue('--accent')
+    : cs.getPropertyValue('--text-faint')
+  ).trim() || '#565656';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
 

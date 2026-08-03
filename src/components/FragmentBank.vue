@@ -112,8 +112,8 @@ function density(fragment: Fragment): number {
 <style scoped>
 .bank {
   background: var(--panel);
-  border-radius: 4px;
-  box-shadow: var(--shadow-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 .bar {

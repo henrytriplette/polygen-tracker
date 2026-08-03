@@ -69,13 +69,14 @@ function onMode(e: Event) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 4px 10px;
+  padding: 7px 12px;
   background: var(--panel);
-  border-radius: 4px;
-  box-shadow: var(--shadow-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 .chords-title {
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
   color: var(--text-faint);

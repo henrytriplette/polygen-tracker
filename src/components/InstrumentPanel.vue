@@ -169,8 +169,8 @@ watch(
 <style scoped>
 .inst {
   background: var(--panel);
-  border-radius: 4px;
-  box-shadow: var(--shadow-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 .inst-bar {
@@ -279,6 +279,7 @@ watch(
 }
 
 .group-title {
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 2px;
   color: var(--text-faint);

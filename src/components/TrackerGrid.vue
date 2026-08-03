@@ -416,13 +416,12 @@ function hasNote(ch: number, row: number): boolean {
 <style scoped>
 .grid-wrap {
   overflow: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   background: var(--panel);
   outline: none;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-panel);
 }
 
 .grid-wrap:focus-within,
@@ -479,7 +478,7 @@ th {
 
 .mini.active {
   background: var(--accent);
-  color: #000;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -545,7 +544,7 @@ td {
 .note.cursor {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  background: rgba(255, 138, 42, 0.22);
+  background: var(--accent-strong);
   color: var(--text-bright) !important;
 }
 
@@ -554,14 +553,14 @@ td {
   cursor: pointer;
 }
 
-.fx:hover { background: rgba(160, 140, 230, 0.12); }
+.fx:hover { background: var(--fx-soft); }
 
 td.selected { background: var(--accent-soft); }
 
 .fx.cursor {
   outline: 2px solid var(--fx);
   outline-offset: -2px;
-  background: rgba(160, 140, 230, 0.2);
+  background: var(--fx-strong);
 }
 
 .empty { color: var(--text-faint); font-weight: 400; }
@@ -571,13 +570,13 @@ tr.beat td { background: var(--row-beat); }
 /* Active insertion row: obvious, but only when this pattern is playing */
 tr.live td {
   background: var(--row-live);
-  color: #000 !important;
+  color: var(--on-accent) !important;
   font-weight: 700;
 }
 
 tr.live td.rownum,
 tr.live td.empty,
-tr.live td.fx { color: rgba(0, 0, 0, 0.55) !important; }
+tr.live td.fx { color: var(--on-accent-dim) !important; }
 
 .edit-bar {
   display: flex;
