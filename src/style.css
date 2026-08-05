@@ -50,8 +50,9 @@
 
   --text: #f4f4f4;
   --text-bright: #ffffff;
-  --text-dim: #8c8c8c;       /* muted labels */
-  --text-faint: #565656;
+  --text-dim: #9a9a9a;       /* secondary labels — ~7:1 on black */
+  --text-faint: #7d7d7d;     /* tertiary / row numbers — ~4.8:1, still recessive */
+  --text-ghost: #4c4c4c;     /* empty-cell placeholders — deliberately barely there */
 
   --accent: #ff2b32;         /* red — the only non-identity color */
   --accent-soft: rgba(255, 43, 50, 0.14);
@@ -106,8 +107,9 @@
 
   --text: #0a0a0a;
   --text-bright: #000000;
-  --text-dim: #7c7c7c;
-  --text-faint: #a6a6a6;
+  --text-dim: #616161;       /* secondary labels — ~5.7:1 on white */
+  --text-faint: #767676;     /* tertiary / row numbers — ~4.5:1, still recessive */
+  --text-ghost: #c4c4c4;     /* empty-cell placeholders — deliberately barely there */
 
   --accent: #d71921;
   --accent-soft: rgba(215, 25, 33, 0.10);
@@ -144,7 +146,7 @@
 }
 
 :root {
-  font: 13px/1.45 var(--mono);
+  font: 14px/1.45 var(--mono);
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;

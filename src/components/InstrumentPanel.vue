@@ -183,7 +183,7 @@ watch(
 
 .toggle {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   font-weight: 700;
   background: none;
@@ -262,7 +262,7 @@ watch(
 }
 
 .env-label {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1px;
   color: var(--text-faint);
 }
@@ -280,7 +280,7 @@ watch(
 
 .group-title {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--text-faint);
   font-weight: 700;
@@ -290,7 +290,7 @@ watch(
 /* Explanatory text, not a control: dimmer than the labels below it. Shown only
    when the ? toggle is on, so the default panel stays compact. */
 .group-desc {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.5;
   color: var(--text-dim);
   margin-bottom: 4px;
@@ -306,7 +306,7 @@ watch(
 }
 
 .s-size {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1px;
   color: var(--text-faint);
 }
@@ -314,7 +314,7 @@ watch(
 .sample.warn .s-size { color: var(--accent); }
 
 .s-msg {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.5;
   color: var(--text-dim);
 }
@@ -329,14 +329,14 @@ watch(
 }
 
 .p-label {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-dim);
   letter-spacing: 0.5px;
 }
 
 .p-value {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text);
   text-align: right;
 }

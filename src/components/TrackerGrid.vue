@@ -563,7 +563,7 @@ td.selected { background: var(--accent-soft); }
   background: var(--fx-strong);
 }
 
-.empty { color: var(--text-faint); font-weight: 400; }
+.empty { color: var(--text-ghost); font-weight: 400; }
 
 tr.beat td { background: var(--row-beat); }
 

@@ -422,7 +422,7 @@ header.bar {
 
 .group-label {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--text-faint);
   font-weight: 700;
@@ -594,7 +594,7 @@ select:focus,
 
 .export-title {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--text-faint);
   font-weight: 700;
