@@ -73,14 +73,15 @@ function labelAt(seqIdx: number): PatternLabel {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 7px 10px;
+  padding: 9px 12px;
   background: var(--panel);
-  border-radius: 4px;
-  box-shadow: var(--shadow-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 .seq-title {
-  font-size: 9px;
+  font-family: var(--mono);
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--text-faint);
   font-weight: 700;
@@ -115,7 +116,7 @@ function labelAt(seqIdx: number): PatternLabel {
 /* Play state → orange fill */
 .seq-slot.playing {
   background: var(--accent);
-  color: #000;
+  color: var(--on-accent);
   border-color: var(--accent);
   font-weight: 700;
 }

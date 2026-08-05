@@ -4,8 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0d10" />
+    <meta name="theme-color" content="#0a0a0a" />
     <title>polygen-tracker</title>
+    <script>
+      // Resolve the theme before first paint so there's no flash of the wrong
+      // one. Stored choice wins; otherwise follow the OS preference.
+      (function () {
+        try {
+          var t = localStorage.getItem('polygen-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.dataset.theme = t;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', t === 'light' ? '#f4f4f4' : '#0a0a0a');
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

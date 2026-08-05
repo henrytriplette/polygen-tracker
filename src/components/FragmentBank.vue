@@ -112,8 +112,8 @@ function density(fragment: Fragment): number {
 <style scoped>
 .bank {
   background: var(--panel);
-  border-radius: 4px;
-  box-shadow: var(--shadow-raise);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 .bar {
@@ -126,7 +126,7 @@ function density(fragment: Fragment): number {
 
 .toggle {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   font-weight: 700;
   background: none;
@@ -156,12 +156,12 @@ function density(fragment: Fragment): number {
 .act.go { color: var(--accent); border-color: var(--accent); }
 .act.go:hover { background: var(--accent-soft); }
 
-.count { font-size: 9px; color: var(--text-faint); letter-spacing: 1px; }
+.count { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
 
 .body { padding: 2px 10px 6px; border-top: 1px solid var(--border-subtle); }
 
 .empty {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.6;
   color: var(--text-dim);
   max-width: 620px;

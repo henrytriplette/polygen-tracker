@@ -199,6 +199,13 @@ interface StoreState {
   instrumentChannel: number | null;
   /** Whether a block has been copied (drives the paste hint in the edit bar). */
   hasClipboard: boolean;
+  /** Active UI theme; mirrors <html data-theme> and localStorage. */
+  theme: 'light' | 'dark';
+}
+
+/** Read the theme the pre-paint script already resolved onto <html>. */
+function initialTheme(): 'light' | 'dark' {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
 const initialSong = loadCurrent() ?? generateSong();
@@ -227,6 +234,7 @@ const state = reactive<StoreState>({
   shareStatus: '',
   instrumentChannel: null,
   hasClipboard: false,
+  theme: initialTheme(),
 });
 
 // --- History + autosave ------------------------------------------------------
@@ -414,6 +422,21 @@ export const store = {
 
   toggleFollow(): void {
     state.follow = !state.follow;
+  },
+
+  /** Flip light/dark, persist the choice, and keep <html> + theme-color in sync. */
+  toggleTheme(): void {
+    const next = state.theme === 'dark' ? 'light' : 'dark';
+    state.theme = next;
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem('polygen-theme', next);
+    } catch {
+      /* storage may be unavailable (private mode) — the in-memory theme still applies */
+    }
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', next === 'light' ? '#f4f4f4' : '#0a0a0a');
   },
 
   playingPattern: computed<PatternLabel | null>(() => {

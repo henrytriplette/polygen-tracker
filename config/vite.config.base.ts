@@ -29,8 +29,8 @@ export default defineConfig({
                 short_name: 'Polygen',
                 description:
                     'Generative chiptune tracker that exports Polyend Tracker compatible projects.',
-                theme_color: '#0c0d10',
-                background_color: '#0c0d10',
+                theme_color: '#0a0a0a',
+                background_color: '#0a0a0a',
                 display: 'standalone',
                 icons: [
                     {

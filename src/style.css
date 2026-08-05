@@ -1,59 +1,152 @@
-/* polygen-tracker — dark-only tracker aesthetic.
-   High-contrast monospace on near-black; channel colors as identity.
+/* polygen-tracker — UI aligned to the triplette.it design system.
+   Pure black (or pure white) ground, flat rounded "surface" cards separated by
+   1px hairlines, a single red accent, pill-shaped action buttons, and system
+   monospace throughout. Two themes via [data-theme] on <html>.
 
-   Visual hierarchy is built on stacked luminance layers (each ~4% brighter),
-   not on borders. Orange is reserved for selection/action/play only. */
+   Identity still lives in the per-channel hues — the one place color earns its
+   keep in a tracker. Everything else is black, white, grey, and red. Red is
+   reserved for selection · action · play · live in both themes. */
+
+/* Doto — open dot-matrix face (OFL), self-hosted. Used ONLY for the wordmark:
+   a single decorative nod to the dot-matrix display. Everything else is mono. */
+@font-face {
+  font-family: 'Doto';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/doto.woff2') format('woff2');
+}
+
 :root {
-  /* --- Elevation layers (darkest -> brightest) ------------------------- */
-  --bg: #0c0d10;             /* workspace floor */
-  --panel: #14161c;          /* resting panels */
-  --panel-raised: #1c1f27;   /* headers / grouped panels */
-  --field: #23272f;          /* interactive input surface — reads as clickable */
-  --field-hover: #2b2f39;    /* input hover */
+  /* --- Type + geometry (theme-independent) ----------------------------- */
+  --mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SF Mono', Menlo, Consolas, 'JetBrains Mono', monospace;
+  --display: 'Doto', var(--mono);
 
-  /* --- Borders: subtle by default, stronger only for editable/selected -- */
-  --border-subtle: #1e2027;  /* barely-there separation */
-  --border: #2b2e37;         /* editable-field outline */
-  --border-strong: #3a3e49;  /* hover / emphasis */
+  --radius: 8px;          /* inputs, selects, small controls */
+  --radius-card: 14px;    /* surface cards */
+  --radius-pill: 999px;   /* action buttons */
 
-  /* --- Typography weights (mono, two-tier) ----------------------------- */
-  --text: #ced1d9;           /* primary label / value */
-  --text-bright: #f4f6fa;    /* emphasized value (bold) */
-  --text-dim: #7b808c;       /* secondary label */
-  --text-faint: #464a54;     /* tertiary / empty */
+  /* Text on an accent-red fill (white in both themes — red is dark enough). */
+  --on-accent: #ffffff;
+  --on-accent-dim: rgba(255, 255, 255, 0.65);
+}
 
-  /* --- Semantic palette (meaning, not decoration) ---------------------- */
-  --accent: #ff8a2a;         /* ONLY: selection · action · play · generate */
-  --accent-soft: rgba(255, 138, 42, 0.14);
-  --info: #4ecbe0;           /* informational highlight (cyan) */
-  --ref: #5a9cff;            /* references / linked data (blue) */
-  --fx: #a08ce6;             /* modulation / automation (purple) */
+/* ====================================================================== */
+/* DARK (default)                                                          */
+/* ====================================================================== */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-  /* One hue per channel. Pitched voices sit in the green→blue range,
-     the three drums share a warm red family, distinguished by lightness. */
-  --ch-lead: #5dd97c;        /* green  — melody */
-  --ch-harmony: #4ecbe0;     /* cyan   — chords */
-  --ch-bass: #e8c95a;        /* yellow — bass */
-  --ch-kick: #e86a5a;        /* red    — kick */
-  --ch-snare: #f0937f;       /* salmon — snare */
-  --ch-hat: #f5bfae;         /* pale   — hat */
-  --ch-arp: #b98ce0;         /* violet — arpeggio */
-  --ch-pad: #7f9be8;         /* blue   — pad */
-  --ch-drums: var(--ch-kick); /* legacy alias */
+  --bg: #000000;             /* pure black ground */
+  --panel: #0c0c0c;          /* surface cards */
+  --panel-raised: #141414;   /* raised / active surface */
+  --field: #171717;          /* interactive input surface */
+  --field-hover: #202020;
 
-  --row-beat: rgba(255, 255, 255, 0.028);
+  --border-subtle: #1a1a1a;
+  --border: #232323;         /* the hairline that defines every card */
+  --border-strong: #383838;
+
+  --text: #f4f4f4;
+  --text-bright: #ffffff;
+  --text-dim: #9a9a9a;       /* secondary labels — ~7:1 on black */
+  --text-faint: #7d7d7d;     /* tertiary / row numbers — ~4.8:1, still recessive */
+  --text-ghost: #4c4c4c;     /* empty-cell placeholders — deliberately barely there */
+
+  --accent: #ff2b32;         /* red — the only non-identity color */
+  --accent-soft: rgba(255, 43, 50, 0.14);
+  --accent-strong: rgba(255, 43, 50, 0.24);
+  --accent-glow: rgba(255, 43, 50, 0.5);
+
+  --info: #4ecbe0;
+  --ref: #5a9cff;
+  --fx: #a88ce6;
+  --fx-soft: rgba(168, 140, 230, 0.13);
+  --fx-strong: rgba(168, 140, 230, 0.22);
+
+  /* One hue per channel */
+  --ch-lead: #5dd97c;
+  --ch-harmony: #4ecbe0;
+  --ch-bass: #e8c95a;
+  --ch-kick: #f0655a;
+  --ch-snare: #f0937f;
+  --ch-hat: #f5bfae;
+  --ch-arp: #b98ce0;
+  --ch-pad: #7f9be8;
+  --ch-drums: var(--ch-kick);
+
+  --row-beat: rgba(255, 255, 255, 0.03);
   --row-hi: rgba(255, 255, 255, 0.055);
   --row-live: var(--accent);
 
-  /* --- Depth ----------------------------------------------------------- */
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.02), 0 2px 8px rgba(0, 0, 0, 0.35);
-  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-raise: 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* Faint dot-matrix texture in the void between cards */
+  --dot: rgba(244, 244, 244, 0.05);
+  --dot-size: 22px;
 
-  --mono: 'JetBrains Mono', ui-monospace, Consolas, 'Cascadia Mono', monospace;
+  --shadow-panel: 0 10px 40px rgba(0, 0, 0, 0.6);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-raise: none;      /* cards are flat — separation comes from borders */
+}
 
+/* ====================================================================== */
+/* LIGHT                                                                   */
+/* ====================================================================== */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-raised: #f6f6f6;
+  --field: #f0f0f0;
+  --field-hover: #e8e8e8;
+
+  --border-subtle: #ededed;
+  --border: #e2e2e2;
+  --border-strong: #cfcfcf;
+
+  --text: #0a0a0a;
+  --text-bright: #000000;
+  --text-dim: #616161;       /* secondary labels — ~5.7:1 on white */
+  --text-faint: #767676;     /* tertiary / row numbers — ~4.5:1, still recessive */
+  --text-ghost: #c4c4c4;     /* empty-cell placeholders — deliberately barely there */
+
+  --accent: #d71921;
+  --accent-soft: rgba(215, 25, 33, 0.10);
+  --accent-strong: rgba(215, 25, 33, 0.18);
+  --accent-glow: rgba(215, 25, 33, 0.34);
+
+  --info: #0e8aa8;
+  --ref: #2563eb;
+  --fx: #7c4fd0;
+  --fx-soft: rgba(124, 79, 208, 0.10);
+  --fx-strong: rgba(124, 79, 208, 0.18);
+
+  /* Darkened channel hues so they read on white */
+  --ch-lead: #1a9c4a;
+  --ch-harmony: #0e8aa8;
+  --ch-bass: #a97b0a;
+  --ch-kick: #d23b2e;
+  --ch-snare: #c05038;
+  --ch-hat: #a25f48;
+  --ch-arp: #7d3fb5;
+  --ch-pad: #3a5bc7;
+  --ch-drums: var(--ch-kick);
+
+  --row-beat: rgba(0, 0, 0, 0.035);
+  --row-hi: rgba(0, 0, 0, 0.06);
+  --row-live: var(--accent);
+
+  --dot: rgba(10, 10, 10, 0.05);
+  --dot-size: 22px;
+
+  --shadow-panel: 0 10px 40px rgba(0, 0, 0, 0.14);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-raise: none;
+}
+
+:root {
   font: 14px/1.45 var(--mono);
-  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -71,14 +164,23 @@ html,
 body,
 #app {
   height: 100%;
-  background: var(--bg);
+}
+
+/* The faint dot-matrix void, showing through the gaps between the cards. */
+html,
+body {
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: var(--dot-size) var(--dot-size);
+  background-position: -1px -1px;
 }
 
 button,
 input,
 select {
   font: inherit;
-  border-radius: 0;
+  border-radius: var(--radius);
+  color: inherit;
 }
 
 select {
@@ -91,11 +193,11 @@ input[type='number']::-webkit-inner-spin-button {
 
 ::selection {
   background: var(--accent);
-  color: #000;
+  color: var(--on-accent);
 }
 
 * {
-  scrollbar-color: var(--border) var(--bg);
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -104,15 +206,15 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: 6px;
   border: 2px solid var(--bg);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: var(--text-faint);
 }
 
 *::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
