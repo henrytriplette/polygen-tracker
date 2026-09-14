@@ -1,8 +1,24 @@
-# polygen-tracker
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo-light.svg" alt="polygen::tracker" height="72">
+  </picture>
+</p>
 
-A generative chiptune tracker PWA that exports songs as **Polyend Tracker compatible projects**.
+<p align="center">
+  A generative chiptune tracker PWA that exports songs as <strong>Polyend Tracker compatible projects</strong>.
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+    <img src="docs/screenshot-light.png" alt="polygen-tracker playing a generated Adventure song: header, composition controls, song sequence, chord bar, instrument editor and the eight-channel pattern grid" width="100%">
+  </picture>
+</p>
 
 Click GENERATE and get a complete 8-channel song — lead, chords, bass, kick, snare, hat, arpeggio and pad — built algorithmically from 15 vibe templates spanning game music, electronic genres and classics. Audition it in the browser, edit notes and sounds by hand, then export the whole thing as a project folder you can drop straight onto a Polyend Tracker's SD card.
+
+Runs entirely client-side, installs as a PWA and works offline. Light and dark themes (☀ / ☾ in the header).
 
 ## Features
 
@@ -85,6 +101,10 @@ A row is always a 16th note, so length changes how long a pattern **runs**, not 
 - The chord progression always divides the pattern into **four equal segments**, so a 128-row pattern holds each chord for eight beats
 
 The result: a 64-row pattern is the same groove over twice the space, not a half-time smear. Exports declare the real track length, so the hardware plays it back at the right size.
+
+<p align="center">
+  <img src="docs/controls-dark.png" alt="Song sequence bar, chord bar and the instrument editor with its ADSR curve and TONE / ENVELOPE / MOTION / TEXTURE parameter groups" width="100%">
+</p>
 
 ### The chord bar
 
@@ -214,6 +234,8 @@ src/
   components/        Vue UI
   store.ts           app state, playback, actions
 ```
+
+`docs/` holds the README assets: the wordmark (`logo-dark.svg` / `logo-light.svg`, the header brand set in [Doto](https://fonts.google.com/specimen/Doto) and converted to paths), the app mark (`mark.svg`, also served as `public/favicon.svg`), screenshots and a 1280×640 `social-preview.png` for the GitHub repository settings.
 
 Polyend file I/O uses the [`@polyend/tracker-lib`](https://github.com/polyend/tracker-lib) npm package. Its public write helpers trigger one browser download per file, so `src/lib/polyend.ts` additionally exposes the package's internal serializer classes (via a `dist` alias in the Vite/TS config) to collect raw buffers for zip packaging — drop the alias once upstream exports buffer-returning writers.
 

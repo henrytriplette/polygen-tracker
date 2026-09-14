@@ -321,7 +321,7 @@ watch(
 
 .param {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 42px;
+  grid-template-columns: 50px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 4px;
   cursor: pointer;
@@ -332,6 +332,7 @@ watch(
   font-size: 10px;
   color: var(--text-dim);
   letter-spacing: 0.5px;
+  white-space: nowrap; /* "LFO RATE" must not wrap inside the fixed-height row */
 }
 
 .p-value {
